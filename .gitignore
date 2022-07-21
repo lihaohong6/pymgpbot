@@ -1,6 +1,6 @@
+.DS_Store
 throttle.ctrl
 pywikibot.lwp
-user-*.py
 *.bak
 *.pyc
 *.pyo
@@ -19,6 +19,7 @@ logs*
 .idea
 pywikibot.egg-info/
 build
+env/
 dist
 docs/_build/
 /scripts/userscripts/*

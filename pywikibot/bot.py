@@ -272,6 +272,10 @@ ui = None  # type: Optional[pywikibot.userinterfaces._interface_base.ABUIC]
 :mod:`pywikibot.userinterfaces` subpackage.
 """
 
+default_tags = "Automation tool" # type: str
+"""
+Default tag in an edit
+"""
 
 def set_interface(module_name: str) -> None:
     """Configures any bots to use the given interface module.
@@ -886,6 +890,9 @@ def handle_args(args: Optional[Iterable[str]] = None,
         option, _, value = arg.partition(':')
         if do_help_val is not False and option == '-help':
             do_help_val = value or True
+        elif option == '-tags':
+            global default_tags
+            default_tags = value
         elif option == '-dir':
             pass
         elif option == '-site':
@@ -1471,7 +1478,7 @@ class BaseBot(OptionHandler):
         ignore_server_errors = kwargs.pop('ignore_server_errors', False)
 
         try:
-            func(*args, **kwargs)
+            func(*args, **kwargs, tags=default_tags)
             self.counter['write'] += 1
         except PageSaveRelatedError as e:
             if not ignore_save_related_errors:
