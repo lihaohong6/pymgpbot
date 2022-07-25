@@ -22,7 +22,8 @@ from pywikibot.exceptions import (
 )
 from pywikibot.site._apisite import APISite
 from pywikibot.site._decorators import need_extension, need_right, need_version
-from pywikibot.tools import itergroup, merge_unique_dicts, remove_last_args
+from pywikibot.tools import merge_unique_dicts, remove_last_args
+from pywikibot.tools.itertools import itergroup
 
 
 __all__ = ('DataSite', )
@@ -744,18 +745,25 @@ class DataSite(APISite):
         try:
             data = req.submit()
         except APIError as e:
-            if e.code == 'wikibase-parse-error-quantity':
+            if e.code.startswith('wikibase-parse-error'):
+                for err in e.other['results']:
+                    if 'error' in err:
+                        pywikibot.error('{error-info} for value {raw!r}, '
+                                        '{expected-format!r} format expected'
+                                        .format_map(err))
                 raise ValueError(e) from None
             raise
+
         if 'results' not in data:
-            raise ValueError('Parsing via wikibase wbparsevalue failed.')
+            raise RuntimeError("Unexpected missing 'results' in query data\n{}"
+                               .format(data))
 
         results = []
         for result_hash in data['results']:
             if 'value' not in result_hash:
-                raise ValueError(
-                    'Parsing via wikibase wbparsevalue failed: {}'
-                    .format(result_hash['error-info']))
+                # There should be an APIError occurred already
+                raise RuntimeError("Unexpected missing 'value' in query data:"
+                                   '\n{}'.format(result_hash))
             results.append(result_hash['value'])
         return results
 

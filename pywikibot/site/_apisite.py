@@ -366,6 +366,7 @@ class APISite(
         try:
             del self.userinfo  # force reload
             if self.userinfo['name'] == self.user():
+                self._loginstatus = _LoginStatus.AS_USER
                 return
 
         # May occur if you are not logged in (no API read permissions).
@@ -508,7 +509,7 @@ class APISite(
     def userinfo(self) -> None:
         """Delete cached userinfo.
 
-        ..versionadded:: 5.5
+        .. versionadded:: 5.5
         """
         if hasattr(self, '_userinfo'):
             del self._userinfo
@@ -580,7 +581,7 @@ class APISite(
     def globaluserinfo(self) -> None:
         """Delete cached globaluserinfo of current user.
 
-        ..versionadded:: 7.0
+        .. versionadded:: 7.0
         """
         username = self.username()
         assert username is not None

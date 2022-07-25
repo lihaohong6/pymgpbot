@@ -10,9 +10,9 @@ Various Wikibase pages are defined in ``page._wikibase.py``,
 various pages for Proofread Extensions are defined in
 ``pywikibot.proofreadpage``.
 
-..note:: `Link` objects represent a wiki-page's title, while
-  :class:`pywikibot.Page` objects (defined here) represent the page
-  itself, including its contents.
+.. note:: `Link` objects represent a wiki-page's title, while
+   :class:`pywikibot.Page` objects (defined here) represent the page
+   itself, including its contents.
 """
 #
 # (C) Pywikibot team, 2008-2022
@@ -1223,7 +1223,7 @@ class BasePage(ComparableMixin):
         if not summary:
             summary = config.default_edit_summary
 
-        if isinstance(watch, bool):
+        if isinstance(watch, bool):  # pragma: no cover
             issue_deprecation_warning(
                 'boolean watch parameter',
                 '"watch", "unwatch", "preferences" or "nochange" value',
@@ -1420,7 +1420,7 @@ class BasePage(ComparableMixin):
         """
         # Deprecate positional arguments and synchronize with Site.pagelinks
         keys = ('namespaces', 'total', 'content')
-        for i, arg in enumerate(args):
+        for i, arg in enumerate(args):  # pragma: no cover
             key = keys[i]
             issue_deprecation_warning(
                 'Positional argument {} ({})'.format(i + 1, arg),
