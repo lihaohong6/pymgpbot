@@ -1,8 +1,10 @@
-mylang = 'mgp'
 family_files['mgp'] = 'https://mzh.moegirl.org.cn/api.php'
+family_files['commons'] = 'https://commons.moegirl.org.cn/api.php'
+mylang = 'mgp'
 family = 'mgp'
 # Your username here
 usernames['mgp']['*'] = 'Lihaohong'
+usernames['commons']['*'] = 'Lihaohong'
 password_file = "user-password.py"
 
 # Slow down the robot such that it never requests a second page within

@@ -1236,7 +1236,7 @@ class BasePage(ComparableMixin):
                 "or site's equivalent of {{in use}} template")
         self._save(summary=summary, watch=watch, minor=minor, botflag=botflag,
                    asynchronous=asynchronous, callback=callback,
-                   cc=apply_cosmetic_changes, quiet=quiet, **kwargs)
+                   cc=apply_cosmetic_changes, quiet=quiet, tags=config.tags, **kwargs)
 
     @allow_asynchronous
     def _save(self, summary=None, watch=None, minor: bool = True, botflag=None,

@@ -116,6 +116,8 @@ _deprecated_variables = {
 }
 _future_variables = {'absolute_import', 'division', 'unicode_literals'}
 
+tags = "Automation tool"
+
 # ############# ACCOUNT SETTINGS ##############
 
 # The family of sites we are working on. pywikibot will import
