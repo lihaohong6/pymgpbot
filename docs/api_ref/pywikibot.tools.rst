@@ -8,6 +8,11 @@ tools.chars module
 
 .. automodule:: pywikibot.tools.chars
 
+tools.collections module
+------------------------
+
+.. automodule:: pywikibot.tools.collections
+
 tools.deprecate module
 ----------------------
 
@@ -22,6 +27,11 @@ tools.formatter module
 ----------------------
 
 .. automodule:: pywikibot.tools.formatter
+
+tools.itertools module
+----------------------
+
+.. automodule:: pywikibot.tools.itertools
 
 tools.\_logging module
 ----------------------

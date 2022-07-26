@@ -25,12 +25,8 @@ from pywikibot.exceptions import (
 )
 from pywikibot.site._decorators import need_right, need_version
 from pywikibot.site._namespace import NamespaceArgType
-from pywikibot.tools import (
-    filter_unique,
-    is_ip_address,
-    issue_deprecation_warning,
-    itergroup,
-)
+from pywikibot.tools import is_ip_address, issue_deprecation_warning
+from pywikibot.tools.itertools import filter_unique, itergroup
 
 
 class GeneratorsMixin:
@@ -1751,8 +1747,6 @@ class GeneratorsMixin:
         return self._generator(api.PageGenerator, type_arg='random',
                                namespaces=namespaces, total=total,
                                g_content=content, **params)
-
-    # TODO: implement undelete
 
     _patrol_errors = {
         'nosuchrcid': 'There is no change with rcid {rcid}',
