@@ -186,6 +186,18 @@ fixes = {
         'regex': True,
         'msg': 'pywikibot-fixes-syntax',
         'replacements': [
+            # CHANGED by LHH:
+            # external links followed immediately by {{lj|..}}
+            (r'\[(?P<url>https?://[^\|\]\{ ]+?)\{\{lj\|', r'[\g<url> {{lj|'),
+            # CHANGED by LHH:
+            # remove <del> and <s> inside 黑幕
+            (r'\{\{(黑幕|[Hh]eimu)\|(?P<P1>[^\}]*)<(del|s)>(?P<P2>[^<^\}]*)</?(del|s)>(?P<P3>[^\}]*)\}\}',
+             r'{{黑幕|\g<P1>\g<P2>\g<P3>}}'),
+            # CHANGED by LHH:
+            # square brackets inside external links
+            # replace internal bracket pair with nowiki
+            (r'\[http(?P<P1>[^\[\]]+)\[(?P<P2>[^\]]+)\]\]',
+             r'[http\g<P1><nowiki>[\g<P2>]</nowiki>]'),
             # external link in double brackets
             (r'\[\[(?P<url>https?://[^\]]+?)\]\]',   r'[\g<url>]'),
             # external link starting with double bracket
@@ -213,7 +225,8 @@ fixes = {
             # template closed by single bracket
             # ATTENTION: There are some false positives, especially in
             # mathematical context or program code.
-            (r'{{([^{}]+?)}(?!})',       r'{{\1}}'),
+            # CHANGED by LHH: remove single bracket instead
+            (r'{{([^{}]+?)}(?!})',       r'{{\1'),
         ],
         'exceptions': {
             'inside-tags': [
@@ -223,6 +236,7 @@ fixes = {
                 'pre',
                 'startspace',       # because of code examples
                 'syntaxhighlight',  # because of code examples
+                'code'              # CHANGED by LHH
             ],
             'text-contains': [
                 r'http://.*?object=tx\|',                # regular dash in URL

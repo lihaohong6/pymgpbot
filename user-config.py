@@ -1,10 +1,10 @@
 family_files['mgp'] = 'https://mzh.moegirl.org.cn/api.php'
 family_files['commons'] = 'https://commons.moegirl.org.cn/api.php'
+family_files['enmgp'] = 'https://en.moegirl.org.cn/api.php'
 mylang = 'mgp'
 family = 'mgp'
 # Your username here
-usernames['mgp']['*'] = 'Lihaohong'
-usernames['commons']['*'] = 'Lihaohong'
+usernames['*']['*'] = 'Lihaohong'
 password_file = "user-password.py"
 
 # Slow down the robot such that it never requests a second page within
@@ -14,7 +14,7 @@ password_file = "user-password.py"
 #
 # 'maxlag' is used to control the rate of server access (see below).
 # Set minthrottle to non-zero to use a throttle on read access.
-minthrottle = 3
+minthrottle = 5
 maxthrottle = 20
 
 # Slow down the robot such that it never makes a second page edit within
