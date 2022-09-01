@@ -307,7 +307,7 @@ def find_alternates(filename, script_paths):
     script_paths = [['.']] + script_paths  # add current directory
     for path in script_paths:
         folder = Path(_pwb_dir).joinpath(*path)
-        if not folder.exists():
+        if not folder.exists() or folder.is_file():
             warning('{} does not exists; remove it from user_script_paths'
                     .format(folder))
             continue
@@ -389,7 +389,8 @@ def find_filename(filename):
     found = test_paths(user_script_paths, config.base_dir)
     if found:  # pragma: no cover
         return found
-
+    if getattr(sys, 'frozen', False):
+        script_paths.insert(0, sys._MEIPASS)
     found = test_paths(script_paths, _pwb_dir)
     if found:
         return found
