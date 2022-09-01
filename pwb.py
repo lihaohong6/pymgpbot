@@ -267,10 +267,10 @@ filename, script_args, global_args = handle_args(*sys.argv)
 # Use env var to communicate to config.py pwb.py location (bug T74918).
 if getattr(sys, 'frozen', False):
     _pwb_dir = sys._MEIPASS
-    pywikibot.warning("pwb dir set to MEIPASS" + str(Path(sys._MEIPASSS)))
+    print("pwb dir set to MEIPASS" + str(Path(sys._MEIPASSS)))
 else:
     _pwb_dir = os.path.split(__file__)[0]
-    pywikibot.warning("pwb dir not set to MEIPASS")
+    print("pwb dir not set to MEIPASS")
 os.environ['PYWIKIBOT_DIR_PWB'] = _pwb_dir
 try:
     import pywikibot as pwb
