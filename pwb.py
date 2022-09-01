@@ -266,6 +266,7 @@ filename, script_args, global_args = handle_args(*sys.argv)
 # Use env var to communicate to config.py pwb.py location (bug T74918).
 if getattr(sys, 'frozen', False):
     _pwb_dir = sys._MEIPASS
+    print("pwb dir set to MEIPASS" + str(Path(sys._MEIPASSS)))
 else:
     _pwb_dir = os.path.split(__file__)[0]
 os.environ['PYWIKIBOT_DIR_PWB'] = _pwb_dir
@@ -390,11 +391,10 @@ def find_filename(filename):
     if found:  # pragma: no cover
         return found
     if getattr(sys, 'frozen', False):
-        script_paths.insert(0, sys._MEIPASS)
+        script_paths.insert(0, str(Path(sys._MEIPASS).joinpath("scripts").absolute()))
     found = test_paths(script_paths, _pwb_dir)
     if found:
         return found
-    raise FileNotFoundError("Cannot find " + filename)
     return find_alternates(filename, path_list)
 
 
