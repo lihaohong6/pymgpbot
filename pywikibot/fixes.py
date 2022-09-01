@@ -188,7 +188,8 @@ fixes = {
         'replacements': [
             # CHANGED by LHH:
             # external links followed immediately by {{lj|..}}
-            (r'\[(?P<url>https?://[^\|\]\{ ]+?)\{\{lj\|', r'[\g<url> {{lj|'),
+            # disabled because the parser can recognize it anyway
+            # (r'\[(?P<url>https?://[^\|\]\{ ]+?)\{\{lj\|', r'[\g<url> {{lj|'),
             # CHANGED by LHH:
             # remove <del> and <s> inside 黑幕
             (r'\{\{(黑幕|[Hh]eimu)\|(?P<P1>[^\}]*)<(del|s)>(?P<P2>[^<^\}]*)</?(del|s)>(?P<P3>[^\}]*)\}\}',
