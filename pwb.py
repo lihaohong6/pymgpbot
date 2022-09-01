@@ -421,7 +421,9 @@ def execute():
 
     file_package = None
 
-    if not os.path.exists(filename):
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        filename = Path(sys._MEIPASS).joinpath("scripts").joinpath(filename)
+    elif not os.path.exists(filename):
         filename = find_filename(filename)
         if filename is None:
             return True
