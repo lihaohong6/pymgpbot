@@ -394,7 +394,7 @@ def find_filename(filename):
     found = test_paths(script_paths, _pwb_dir)
     if found:
         return found
-
+    raise FileNotFoundError("Cannot find " + filename)
     return find_alternates(filename, path_list)
 
 
