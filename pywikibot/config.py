@@ -326,6 +326,8 @@ def get_base_dir(test_directory: Optional[str] = None) -> str:
             base_dir = os.path.abspath(environ['PYWIKIBOT_DIR'])
         elif exists('.'):
             base_dir = os.path.abspath('.')
+        elif getattr(sys, 'frozen', False) and exists(sys._MEIPASS):
+            base_dir = os.path.abspath(sys._MEIPASS)
         elif ('PYWIKIBOT_DIR_PWB' in environ
                 and exists(os.path.abspath(environ['PYWIKIBOT_DIR_PWB']))):
             base_dir = os.path.abspath(environ['PYWIKIBOT_DIR_PWB'])

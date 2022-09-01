@@ -843,7 +843,10 @@ def calledModuleName() -> str:
     and because the module name will be used for the filename of the log.
 
     """
-    return Path(pywikibot.argvu[0]).stem
+    if getattr(sys, 'frozen', False):
+        return Path(sys._MEIPASS).stem
+    else:
+        return Path(pywikibot.argvu[0]).stem
 
 
 def handle_args(args: Optional[Iterable[str]] = None,

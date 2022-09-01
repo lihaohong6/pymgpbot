@@ -85,7 +85,7 @@ def copy_files() -> None:
 
     target = target / 'i18n' / 'pywikibot'
     info(f'copy i18n files to {target} ... ', newline=False)
-    target.parent.mkdir()
+    target.parent.mkdir(exist_ok=True)
     filename = '__init__.py'
     shutil.copy(folder / 'scripts' / 'i18n' / filename,
                 target.parent / filename)
