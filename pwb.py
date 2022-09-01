@@ -264,7 +264,10 @@ filename, script_args, global_args = handle_args(*sys.argv)
 # If successful, user-config.py already exists in one of the candidate
 # directories. See config.py for details on search order.
 # Use env var to communicate to config.py pwb.py location (bug T74918).
-_pwb_dir = os.path.split(__file__)[0]
+if getattr(sys, 'frozen', False):
+    _pwb_dir = sys._MEIPASS
+else:
+    _pwb_dir = os.path.split(__file__)[0]
 os.environ['PYWIKIBOT_DIR_PWB'] = _pwb_dir
 try:
     import pywikibot as pwb
