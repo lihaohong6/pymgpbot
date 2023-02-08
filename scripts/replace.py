@@ -749,7 +749,8 @@ class ReplaceRobot(SingleSiteBot, ExistingPageBot):
                 self.opt.always = True
             if choice == 'y':
                 self.save(page, original_text, new_text, applied,
-                          show_diff=False, asynchronous=True)
+                          show_diff=False, asynchronous=True,
+                          watch="nochange")
 
             # choice must be 'N'
             break

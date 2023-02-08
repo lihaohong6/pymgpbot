@@ -1,9 +1,11 @@
 family_files['mgp'] = 'https://mzh.moegirl.org.cn/api.php'
 family_files['commons'] = 'https://commons.moegirl.org.cn/api.php'
 family_files['enmgp'] = 'https://en.moegirl.org.cn/api.php'
+family_files['mirror'] = 'https://moegirl.uk/api.php'
 mylang = 'mgp'
 family = 'mgp'
 # Your username here
+usernames['mirror']['*'] = 'Lihb'
 usernames['*']['*'] = 'Lihaohong'
 password_file = "user-password.py"
 
@@ -14,7 +16,7 @@ password_file = "user-password.py"
 #
 # 'maxlag' is used to control the rate of server access (see below).
 # Set minthrottle to non-zero to use a throttle on read access.
-minthrottle = 5
+minthrottle = 1
 maxthrottle = 20
 
 # Slow down the robot such that it never makes a second page edit within
@@ -23,4 +25,4 @@ put_throttle = 20  # type: Union[int, float]
 
 # Sometimes you want to know when a delay is inserted. If a delay is larger
 # than 'noisysleep' seconds, it is logged on the screen.
-noisysleep = 3.0
+noisysleep = 1.0
