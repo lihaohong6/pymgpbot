@@ -1,19 +1,19 @@
-pywikibot.comms package
-=======================
+************************************
+:mod:`comms` --- Communication layer
+************************************
 
-.. automodule:: pywikibot.comms
-
-Submodules
-----------
-
-pywikibot.comms.eventstreams module
------------------------------------
-
-.. automodule:: pywikibot.comms.eventstreams
-
-pywikibot.comms.http module
----------------------------
-
-.. automodule:: pywikibot.comms.http
+.. automodule:: comms
+   :synopsis: Communication layer
 
 
+:mod:`comms.eventstreams` --- Server-Sent Events Client
+=======================================================
+
+.. automodule:: comms.eventstreams
+   :synopsis: Server-Sent Events client
+
+:mod:`comms.http` --- HTTP access interface
+===========================================
+
+.. automodule:: comms.http
+   :synopsis: Basic HTTP access interface

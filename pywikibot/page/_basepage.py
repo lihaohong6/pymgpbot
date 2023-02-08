@@ -1,40 +1,33 @@
-"""Objects representing various types of MediaWiki pages.
-
-This module includes objects:
-
-- BasePage: Base object for a MediaWiki page
-- Page: A MediaWiki page
-- Category: A page in the Category: namespace
-
-Various Wikibase pages are defined in ``page._wikibase.py``,
-various pages for Proofread Extensions are defined in
-``pywikibot.proofreadpage``.
-
-.. note:: `Link` objects represent a wiki-page's title, while
-   :class:`pywikibot.Page` objects (defined here) represent the page
-   itself, including its contents.
-"""
+"""Objects representing a base object for a MediaWiki page."""
 #
-# (C) Pywikibot team, 2008-2022
+# (C) Pywikibot team, 2008-2023
 #
 # Distributed under the terms of the MIT license.
 #
+import itertools
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 from contextlib import suppress
 from itertools import islice
 from textwrap import shorten, wrap
-from typing import Optional, Union
+from typing import Optional
 from urllib.parse import quote_from_bytes
 from warnings import warn
 
 import pywikibot
-from pywikibot import Timestamp, config, date, i18n, textlib
-from pywikibot.backports import Generator, Iterable, List
+from pywikibot import Timestamp, config, date, i18n, textlib, tools
+from pywikibot.backports import (
+    Dict,
+    Generator,
+    Iterable,
+    Iterator,
+    List,
+    Set,
+    Tuple,
+)
 from pywikibot.cosmetic_changes import CANCEL, CosmeticChangesToolkit
 from pywikibot.exceptions import (
     Error,
-    InterwikiRedirectPageError,
     InvalidPageError,
     IsNotRedirectPageError,
     IsRedirectPageError,
@@ -44,7 +37,6 @@ from pywikibot.exceptions import (
     OtherPageSaveError,
     PageSaveRelatedError,
     SectionError,
-    UnknownExtensionError,
 )
 from pywikibot.page._decorators import allow_asynchronous
 from pywikibot.page._links import BaseLink, Link
@@ -52,6 +44,7 @@ from pywikibot.site import Namespace, NamespaceArgType
 from pywikibot.tools import (
     ComparableMixin,
     cached,
+    deprecated,
     first_upper,
     issue_deprecation_warning,
     remove_last_args,
@@ -60,11 +53,7 @@ from pywikibot.tools import (
 
 PROTOCOL_REGEX = r'\Ahttps?://'
 
-__all__ = (
-    'BasePage',
-    'Category',
-    'Page',
-)
+__all__ = ['BasePage']
 
 
 class BasePage(ComparableMixin):
@@ -125,7 +114,7 @@ class BasePage(ComparableMixin):
         if isinstance(source, pywikibot.site.BaseSite):
             self._link = Link(title, source=source, default_namespace=ns)
             self._revisions = {}
-        elif isinstance(source, Page):
+        elif isinstance(source, BasePage):
             # copy all of source's attributes to this object
             # without overwriting non-None values
             self.__dict__.update((k, v) for k, v in source.__dict__.items()
@@ -277,14 +266,14 @@ class BasePage(ComparableMixin):
                 else:
                     # use this form for sites like commons, where the
                     # code is the same as the family name
-                    title = '{}:{}'.format(self.site.code, title)
+                    title = f'{self.site.code}:{title}'
             elif textlink and (self.is_filepage() or self.is_categorypage()):
-                title = ':{}'.format(title)
+                title = f':{title}'
             elif self.namespace() == 0 and not section:
                 with_ns = True
             if with_ns:
-                return '[[{}{}]]'.format(title, section)
-            return '[[{}{}|{}]]'.format(title, section, label)
+                return f'[[{title}{section}]]'
+            return f'[[{title}{section}|{label}]]'
         if not with_ns and self.namespace() != 0:
             title = label + section
         else:
@@ -298,14 +287,7 @@ class BasePage(ComparableMixin):
             encoded_title = title.encode(self.site.encoding())
             title = quote_from_bytes(encoded_title, safe='')
         if as_filename:
-            # Replace characters that are not possible in file names on some
-            # systems, but still are valid in MediaWiki titles:
-            # Unix: /
-            # MediaWiki: /:\
-            # Windows: /:\"?*
-            # Spaces are possible on most systems, but are bad for URLs.
-            for forbidden in ':*?/\\" ':
-                title = title.replace(forbidden, '_')
+            title = tools.as_filename(title)
         return title
 
     def section(self) -> Optional[str]:
@@ -327,7 +309,7 @@ class BasePage(ComparableMixin):
 
     def __repr__(self) -> str:
         """Return a more complete string representation."""
-        return '{}({!r})'.format(self.__class__.__name__, self.title())
+        return f'{self.__class__.__name__}({self.title()!r})'
 
     def _cmpkey(self):
         """
@@ -400,6 +382,16 @@ class BasePage(ComparableMixin):
                 raise
 
         return self.latest_revision.text
+
+    def has_content(self) -> bool:
+        """
+        Page has been loaded.
+
+        Not existing pages are considered loaded.
+
+        .. versionadded:: 7.6
+        """
+        return not self.exists() or self._latest_cached_revision() is not None
 
     def _latest_cached_revision(self):
         """Get the latest revision if cached and has text, otherwise None."""
@@ -502,8 +494,20 @@ class BasePage(ComparableMixin):
         self._revid = value
 
     @property
-    def latest_revision(self):
-        """Return the current revision for this page."""
+    def latest_revision(self) -> 'pywikibot.page.Revision':
+        """Return the current revision for this page.
+
+        **Example:**
+
+        >>> site = pywikibot.Site()
+        >>> page = pywikibot.Page(site, 'Main Page')
+        ... # get the latest timestamp of that page
+        >>> edit_time = page.latest_revision.timestamp
+        >>> type(edit_time)
+        <class 'pywikibot.time.Timestamp'>
+
+        .. seealso:: :attr:`oldest_revision`
+        """
         rev = self._latest_cached_revision()
         if rev is not None:
             return rev
@@ -717,8 +721,14 @@ class BasePage(ComparableMixin):
 
         return None
 
+    @deprecated('latest_revision.timestamp', since='8.0.0')
     def editTime(self) -> pywikibot.Timestamp:
-        """Return timestamp of last revision to page."""
+        """Return timestamp of last revision to page.
+
+        .. deprecated:: 8.0.0
+           Use :attr:`latest_revision.timestamp<latest_revision>`
+           instead.
+        """
         return self.latest_revision.timestamp
 
     def exists(self) -> bool:
@@ -732,11 +742,19 @@ class BasePage(ComparableMixin):
         raise InvalidPageError(self)
 
     @property
-    def oldest_revision(self):
-        """
-        Return the first revision of this page.
+    def oldest_revision(self) -> 'pywikibot.page.Revision':
+        """Return the first revision of this page.
 
-        :rtype: :py:obj:`Revision`
+        **Example:**
+
+        >>> site = pywikibot.Site()
+        >>> page = pywikibot.Page(site, 'Main Page')
+        ... # get the creation timestamp of that page
+        >>> creation_time = page.oldest_revision.timestamp
+        >>> type(creation_time)
+        <class 'pywikibot.time.Timestamp'>
+
+        .. seealso:: :attr:`latest_revision`
         """
         return next(self.revisions(reverse=True, total=1))
 
@@ -797,10 +815,10 @@ class BasePage(ComparableMixin):
 
         return bool(self._catredirect)
 
-    def getCategoryRedirectTarget(self) -> 'Category':
+    def getCategoryRedirectTarget(self) -> 'pywikibot.Category':
         """If this is a category redirect, return the target category title."""
         if self.isCategoryRedirect():
-            return Category(Link(self._catredirect, self.site))
+            return pywikibot.Category(Link(self._catredirect, self.site))
         raise IsNotRedirectPageError(self)
 
     def isTalkPage(self):
@@ -808,7 +826,7 @@ class BasePage(ComparableMixin):
         ns = self.namespace()
         return ns >= 0 and ns % 2 == 1
 
-    def toggleTalkPage(self) -> Optional['Page']:
+    def toggleTalkPage(self) -> Optional['pywikibot.Page']:
         """
         Return other member of the article-talk page pair for this Page.
 
@@ -824,8 +842,8 @@ class BasePage(ComparableMixin):
 
         title = self.title(with_ns=False)
         new_ns = ns + (1, -1)[self.isTalkPage()]
-        return Page(self.site,
-                    '{}:{}'.format(self.site.namespace(new_ns), title))
+        return pywikibot.Page(self.site,
+                              f'{self.site.namespace(new_ns)}:{title}')
 
     def is_categorypage(self):
         """Return True if the page is a Category, False otherwise."""
@@ -867,8 +885,8 @@ class BasePage(ComparableMixin):
             except KeyError:
                 distl = None
             if distl is None:
-                disambigpages = Page(self.site,
-                                     'MediaWiki:Disambiguationspage')
+                disambigpages = pywikibot.Page(self.site,
+                                               'MediaWiki:Disambiguationspage')
                 if disambigpages.exists():
                     disambigs = {link.title(with_ns=False)
                                  for link in disambigpages.linkedPages()
@@ -1014,43 +1032,64 @@ class BasePage(ComparableMixin):
             content=content,
         )
 
-    def protection(self) -> dict:
-        """Return a dictionary reflecting page protections."""
+    def protection(self) -> Dict[str, Tuple[str, str]]:
+        """Return a dictionary reflecting page protections.
+
+        **Example:**
+
+        >>> site = pywikibot.Site('wikipedia:test')
+        >>> page = pywikibot.Page(site, 'Main Page')
+        >>> page.protection()
+        {'edit': ('sysop', 'infinity'), 'move': ('sysop', 'infinity')}
+
+        .. seealso::
+           - :meth:`Site.page_restrictions()
+             <pywikibot.site._apisite.APISite.page_restrictions>`
+           - :meth:`applicable_protections`
+           - :meth:`protect`
+        """
         return self.site.page_restrictions(self)
 
-    def applicable_protections(self) -> set:
+    def applicable_protections(self) -> Set[str]:
+        """Return the protection types allowed for that page.
+
+        **Example:**
+
+        >>> site = pywikibot.Site('wikipedia:test')
+        >>> page = pywikibot.Page(site, 'Main Page')
+        >>> sorted(page.applicable_protections())
+        ['edit', 'move']
+
+        .. seealso::
+           - :meth:`protect`
+           - :meth:`protection`
         """
-        Return the protection types allowed for that page.
-
-        If the page doesn't exist it only returns "create". Otherwise it
-        returns all protection types provided by the site, except "create".
-        It also removes "upload" if that page is not in the File namespace.
-
-        It is possible, that it returns an empty set, but only if original
-        protection types were removed.
-
-        :return: set of str
-        """
-        # New API since commit 32083235eb332c419df2063cf966b3400be7ee8a
-        if self.site.mw_version >= '1.25wmf14':
-            self.site.loadpageinfo(self)
-            return self._applicable_protections
-
-        p_types = set(self.site.protection_types())
-        if not self.exists():
-            return {'create'} if 'create' in p_types else set()
-        p_types.remove('create')  # no existing page allows that
-        if not self.is_filepage():  # only file pages allow upload
-            p_types.remove('upload')
-        return p_types
+        self.site.loadpageinfo(self)
+        return self._applicable_protections
 
     def has_permission(self, action: str = 'edit') -> bool:
         """Determine whether the page can be modified.
 
         Return True if the bot has the permission of needed restriction level
-        for the given action type.
+        for the given action type:
 
-        :param action: a valid restriction type like 'edit', 'move'
+        >>> site = pywikibot.Site('test')
+        >>> page = pywikibot.Page(site, 'Main Page')
+        >>> page.has_permission()
+        False
+        >>> page.has_permission('move')
+        False
+        >>> page.has_permission('invalid')
+        Traceback (most recent call last):
+        ...
+        ValueError: APISite.page_can_be_edited(): Invalid value "invalid" ...
+
+        .. seealso:: :meth:`APISite.page_can_be_edited()
+           <pywikibot.site._apisite.APISite.page_can_be_edited>`
+
+
+        :param action: a valid restriction type like 'edit', 'move';
+            default is ``edit``.
         :raises ValueError: invalid action parameter
         """
         return self.site.page_can_be_edited(self, action)
@@ -1068,7 +1107,7 @@ class BasePage(ComparableMixin):
 
         The framework enforces this restriction by default. It is possible
         to override this by setting ignore_bot_templates=True in
-        user-config.py, or using page.put(force=True).
+        user cnfig file (user-config.py), or using page.put(force=True).
         """
         if not hasattr(self, '_bot_may_edit'):
             self._bot_may_edit = self._check_bot_may_edit()
@@ -1250,10 +1289,10 @@ class BasePage(ComparableMixin):
                                   watch=watch, bot=botflag, **kwargs)
         if not done:
             if not quiet:
-                pywikibot.warning('Page {} not saved'.format(link))
+                pywikibot.warning(f'Page {link} not saved')
             raise PageSaveRelatedError(self)
         if not quiet:
-            pywikibot.output('Page {} saved'.format(link))
+            pywikibot.info(f'Page {link} saved')
 
     def _cosmetic_changes_hook(self, summary: str) -> str:
         """The cosmetic changes hook.
@@ -1287,14 +1326,10 @@ class BasePage(ComparableMixin):
         cc_toolkit = CosmeticChangesToolkit(self, ignore=CANCEL.MATCH)
         self.text = cc_toolkit.change(old)
 
-        # i18n package changed in Pywikibot 7.0.0
-        old_i18n = i18n.twtranslate(self.site, 'cosmetic_changes-append',
-                                    fallback_prompt='; cosmetic changes')
         if summary and old.strip().replace(
                 '\r\n', '\n') != self.text.strip().replace('\r\n', '\n'):
             summary += i18n.twtranslate(self.site,
-                                        'pywikibot-cosmetic-changes',
-                                        fallback_prompt=old_i18n)
+                                        'pywikibot-cosmetic-changes')
         return summary
 
     def put(self, newtext: str,
@@ -1423,8 +1458,8 @@ class BasePage(ComparableMixin):
         for i, arg in enumerate(args):  # pragma: no cover
             key = keys[i]
             issue_deprecation_warning(
-                'Positional argument {} ({})'.format(i + 1, arg),
-                'keyword argument "{}={}"'.format(key, arg),
+                f'Positional argument {i + 1} ({arg})',
+                f'keyword argument "{key}={arg}"',
                 since='7.0.0')
             if key in kwargs:
                 pywikibot.warning('{!r} is given as keyword argument {!r} '
@@ -1453,7 +1488,7 @@ class BasePage(ComparableMixin):
             text = self.text
         for linkmatch in pywikibot.link_regex.finditer(
                 textlib.removeDisabledParts(text)):
-            linktitle = linkmatch.group('title')
+            linktitle = linkmatch['title']
             link = Link(linktitle, self.site)
             # only yield links that are to a different site and that
             # are not language links
@@ -1481,10 +1516,10 @@ class BasePage(ComparableMixin):
         # this list if the method was called with include_obsolete=False
         # (which is the default)
         if not hasattr(self, '_langlinks'):
-            self._langlinks = list(self.iterlanglinks(include_obsolete=True))
+            self._langlinks = set(self.iterlanglinks(include_obsolete=True))
 
         if include_obsolete:
-            return self._langlinks
+            return list(self._langlinks)
         return [i for i in self._langlinks if not i.site.obsolete]
 
     def iterlanglinks(self,
@@ -1515,7 +1550,7 @@ class BasePage(ComparableMixin):
         """
         return pywikibot.ItemPage.fromPage(self)
 
-    def templates(self, content: bool = False):
+    def templates(self, content: bool = False) -> List['pywikibot.Page']:
         """
         Return a list of Page objects for templates used on this Page.
 
@@ -1528,10 +1563,16 @@ class BasePage(ComparableMixin):
         :param content: bool
         """
         # Data might have been preloaded
-        if not hasattr(self, '_templates'):
-            self._templates = list(self.itertemplates(content=content))
+        # Delete cache if content is needed and elements have no content
+        if (hasattr(self, '_templates')
+                and content
+                and not all(t.has_content() for t in self._templates)):
+            del self._templates
 
-        return self._templates
+        if not hasattr(self, '_templates'):
+            self._templates = set(self.itertemplates(content=content))
+
+        return list(self._templates)
 
     def itertemplates(self,
                       total: Optional[int] = None,
@@ -1549,7 +1590,8 @@ class BasePage(ComparableMixin):
         :param content: bool
         """
         if hasattr(self, '_templates'):
-            return iter(self._templates)
+            return itertools.islice(self.templates(content=content), total)
+
         return self.site.pagetemplates(self, total=total, content=content)
 
     def imagelinks(self, total: Optional[int] = None, content: bool = False):
@@ -1566,7 +1608,7 @@ class BasePage(ComparableMixin):
     def categories(self,
                    with_sort_key: bool = False,
                    total: Optional[int] = None,
-                   content: bool = False):
+                   content: bool = False) -> Iterator['pywikibot.Page']:
         """
         Iterate categories that the article is in.
 
@@ -1580,6 +1622,15 @@ class BasePage(ComparableMixin):
         # FIXME: bug T75561: with_sort_key is ignored by Site.pagecategories
         if with_sort_key:
             raise NotImplementedError('with_sort_key is not implemented')
+
+        # Data might have been preloaded
+        # Delete cache if content is needed and elements have no content
+        if hasattr(self, '_categories'):
+            if (content
+                    and not all(c.has_content() for c in self._categories)):
+                del self._categories
+            else:
+                return itertools.islice(self._categories, total)
 
         return self.site.pagecategories(self, total=total, content=content)
 
@@ -1740,20 +1791,20 @@ class BasePage(ComparableMixin):
                    if isinstance(user, pywikibot.User) else cnt[user]
                    for user in contributors)
 
-    def merge_history(self, dest, timestamp=None, reason=None) -> None:
-        """
-        Merge revisions from this page into another page.
+    def merge_history(self,
+                      dest: 'BasePage',
+                      timestamp: Optional[pywikibot.Timestamp] = None,
+                      reason: Optional[str] = None) -> None:
+        """Merge revisions from this page into another page.
 
-        See :py:obj:`APISite.merge_history` for details.
+        .. seealso:: :meth:`APISite.merge_history()
+           <pywikibot.site._apisite.APISite.merge_history>` for details.
 
         :param dest: Destination page to which revisions will be merged
-        :type dest: pywikibot.Page
         :param timestamp: Revisions from this page dating up to this timestamp
             will be merged into the destination page (if not given or False,
             all revisions will be merged)
-        :type timestamp: pywikibot.Timestamp
         :param reason: Optional reason for the history merge
-        :type reason: str
         """
         self.site.merge_history(self, dest, timestamp, reason)
 
@@ -1767,7 +1818,7 @@ class BasePage(ComparableMixin):
         Move this page to a new title.
 
         .. versionchanged:: 7.2
-           The `movesubpages` parameter was added
+           The *movesubpages* parameter was added
 
         :param newtitle: The new page title.
         :param reason: The edit summary for the move.
@@ -1777,8 +1828,7 @@ class BasePage(ComparableMixin):
         :param movesubpages: Rename subpages, if applicable.
         """
         if reason is None:
-            pywikibot.output('Moving {} to [[{}]].'
-                             .format(self.title(as_link=True), newtitle))
+            pywikibot.info(f'Moving {self} to [[{newtitle}]].')
             reason = pywikibot.input('Please enter a reason for the move:')
         return self.site.movepage(self, newtitle, reason,
                                   movetalk=movetalk,
@@ -1817,7 +1867,7 @@ class BasePage(ComparableMixin):
             -1       page was marked for deletion
         """
         if reason is None:
-            pywikibot.output('Deleting {}.'.format(self.title(as_link=True)))
+            pywikibot.info(f'Deleting {self.title(as_link=True)}.')
             reason = pywikibot.input('Please enter a reason for the deletion:')
 
         # If user has 'delete' right, delete the page
@@ -1960,34 +2010,42 @@ class BasePage(ComparableMixin):
         if reason is None:
             warn('Not passing a reason for undelete() is deprecated.',
                  DeprecationWarning)
-            pywikibot.output('Undeleting {}.'.format(self.title(as_link=True)))
+            pywikibot.info(f'Undeleting {self.title(as_link=True)}.')
             reason = pywikibot.input(
                 'Please enter a reason for the undeletion:')
         self.site.undelete(self, reason, revision=undelete_revs)
 
     def protect(self,
                 reason: Optional[str] = None,
-                protections: Optional[dict] = None,
+                protections: Optional[Dict[str, Optional[str]]] = None,
                 **kwargs) -> None:
-        """
-        Protect or unprotect a wiki page. Requires administrator status.
+        """Protect or unprotect a wiki page. Requires  *protect* right.
 
-        Valid protection levels are '' (equivalent to 'none'),
-        'autoconfirmed', 'sysop' and 'all'. 'all' means 'everyone is allowed',
-        i.e. that protection type will be unprotected.
+        Valid protection levels are ``''`` (equivalent to ``None``),
+        ``'autoconfirmed'``, ``'sysop'`` and ``'all'``. ``'all'`` means
+        everyone is allowed, i.e. that protection type will be
+        unprotected.
 
-        In order to unprotect a type of permission, the protection level shall
-        be either set to 'all' or '' or skipped in the protections dictionary.
+        In order to unprotect a type of permission, the protection level
+        shall be either set to ``'all'`` or ``''`` or skipped in the
+        protections dictionary.
 
-        Expiry of protections can be set via kwargs, see Site.protect() for
+        Expiry of protections can be set via *kwargs*, see
+        :meth:`Site.protect()<pywikibot.site._apisite.APISite.protect>` for
         details. By default there is no expiry for the protection types.
 
-        :param protections: A dict mapping type of protection to protection
-            level of that type. Allowed protection types for a page can be
-            retrieved by Page.self.applicable_protections()
+        .. seealso::
+           - :meth:`Site.protect()
+             <pywikibot.site._apisite.APISite.protect>`
+           - :meth:`applicable_protections`
+
+        :param protections: A dict mapping type of protection to
+            protection level of that type. Allowed protection types for
+            a page can be retrieved by :meth:`applicable_protections`.
             Defaults to protections is None, which means unprotect all
             protection types.
-            Example: {'move': 'sysop', 'edit': 'autoconfirmed'}
+
+            Example: ``{'move': 'sysop', 'edit': 'autoconfirmed'}``
 
         :param reason: Reason for the action, default is None and will set an
             empty string.
@@ -2039,19 +2097,16 @@ class BasePage(ComparableMixin):
                 cats.append(cat)
 
         if not self.has_permission():
-            pywikibot.output("Can't edit {}, skipping it..."
-                             .format(self.title(as_link=True)))
+            pywikibot.info(f"Can't edit {self}, skipping it...")
             return False
 
         if old_cat not in cats:
             if self.namespace() != 10:
                 pywikibot.error('{} is not in category {}!'
-                                .format(self.title(as_link=True),
-                                        old_cat.title()))
+                                .format(self, old_cat.title()))
             else:
-                pywikibot.output('{} is not in category {}, skipping...'
-                                 .format(self.title(as_link=True),
-                                         old_cat.title()))
+                pywikibot.info('{} is not in category {}, skipping...'
+                               .format(self, old_cat.title()))
             return False
 
         # This prevents the bot from adding new_cat if it is already present.
@@ -2068,8 +2123,9 @@ class BasePage(ComparableMixin):
                 if sort_key is True:
                     # Fetch sort_key from old_cat in current page.
                     sort_key = cats[old_cat_pos].sortKey
-                cats[old_cat_pos] = Category(self.site, new_cat.title(),
-                                             sort_key=sort_key)
+                cats[old_cat_pos] = pywikibot.Category(self.site,
+                                                       new_cat.title(),
+                                                       sort_key=sort_key)
             else:
                 cats.pop(old_cat_pos)
 
@@ -2078,19 +2134,18 @@ class BasePage(ComparableMixin):
             except ValueError:
                 # Make sure that the only way replaceCategoryLinks() can return
                 # a ValueError is in the case of interwiki links to self.
-                pywikibot.output('Skipping {} because of interwiki link to '
-                                 'self'.format(self.title()))
+                pywikibot.info(
+                    f'Skipping {self} because of interwiki link to self')
                 return False
 
         if oldtext != newtext:
             try:
                 self.put(newtext, summary, show_diff=show_diff)
             except PageSaveRelatedError as error:
-                pywikibot.output('Page {} not saved: {}'
-                                 .format(self.title(as_link=True), error))
+                pywikibot.info(f'Page {self} not saved: {error}')
             except NoUsernameError:
-                pywikibot.output('Page {} not saved; sysop privileges '
-                                 'required.'.format(self.title(as_link=True)))
+                pywikibot.info(
+                    f'Page {self} not saved; sysop privileges required.')
             else:
                 return True
 
@@ -2127,507 +2182,5 @@ class BasePage(ComparableMixin):
             if not with_protocol:
                 return re.sub(PROTOCOL_REGEX, '', link)
         elif with_protocol:
-            return '{}://{}'.format(wiki.protocol(), link)
+            return f'{wiki.protocol()}://{link}'
         return link
-
-
-class Page(BasePage):
-
-    """Page: A MediaWiki page."""
-
-    def __init__(self, source, title: str = '', ns=0) -> None:
-        """Instantiate a Page object."""
-        if isinstance(source, pywikibot.site.BaseSite) and not title:
-            raise ValueError('Title must be specified and not empty '
-                             'if source is a Site.')
-        super().__init__(source, title, ns)
-
-    @property
-    @cached
-    def raw_extracted_templates(self):
-        """
-        Extract templates using :py:obj:`textlib.extract_templates_and_params`.
-
-        Disabled parts and whitespace are stripped, except for
-        whitespace in anonymous positional arguments.
-
-        :rtype: list of (str, OrderedDict)
-        """
-        return textlib.extract_templates_and_params(self.text, True, True)
-
-    def templatesWithParams(self):
-        """
-        Return templates used on this Page.
-
-        The templates are extracted by
-        :py:obj:`textlib.extract_templates_and_params`, with positional
-        arguments placed first in order, and each named argument
-        appearing as 'name=value'.
-
-        All parameter keys and values for each template are stripped of
-        whitespace.
-
-        :return: a list of tuples with one tuple for each template invocation
-            in the page, with the template Page as the first entry and a list
-            of parameters as the second entry.
-        :rtype: list of (pywikibot.page.Page, list)
-        """
-        # WARNING: may not return all templates used in particularly
-        # intricate cases such as template substitution
-        titles = {t.title() for t in self.templates()}
-        templates = self.raw_extracted_templates
-        # backwards-compatibility: convert the dict returned as the second
-        # element into a list in the format used by old scripts
-        result = []
-        for template in templates:
-            try:
-                link = pywikibot.Link(template[0], self.site,
-                                      default_namespace=10)
-                if link.canonical_title() not in titles:
-                    continue
-            except Error:
-                # this is a parser function or magic word, not template name
-                # the template name might also contain invalid parts
-                continue
-            args = template[1]
-            intkeys = {}
-            named = {}
-            positional = []
-            for key in sorted(args):
-                try:
-                    intkeys[int(key)] = args[key]
-                except ValueError:
-                    named[key] = args[key]
-
-            for i in range(1, len(intkeys) + 1):
-                # only those args with consecutive integer keys can be
-                # treated as positional; an integer could also be used
-                # (out of order) as the key for a named argument
-                # example: {{tmp|one|two|5=five|three}}
-                if i in intkeys:
-                    positional.append(intkeys[i])
-                    continue
-
-                for k in intkeys:
-                    if k < 1 or k >= i:
-                        named[str(k)] = intkeys[k]
-                break
-
-            for item in named.items():
-                positional.append('{}={}'.format(*item))
-            result.append((pywikibot.Page(link, self.site), positional))
-        return result
-
-    def set_redirect_target(
-        self,
-        target_page,
-        create: bool = False,
-        force: bool = False,
-        keep_section: bool = False,
-        save: bool = True,
-        **kwargs
-    ):
-        """
-        Change the page's text to point to the redirect page.
-
-        :param target_page: target of the redirect, this argument is required.
-        :type target_page: pywikibot.Page or string
-        :param create: if true, it creates the redirect even if the page
-            doesn't exist.
-        :param force: if true, it set the redirect target even the page
-            doesn't exist or it's not redirect.
-        :param keep_section: if the old redirect links to a section
-            and the new one doesn't it uses the old redirect's section.
-        :param save: if true, it saves the page immediately.
-        :param kwargs: Arguments which are used for saving the page directly
-            afterwards, like 'summary' for edit summary.
-        """
-        if isinstance(target_page, str):
-            target_page = pywikibot.Page(self.site, target_page)
-        elif self.site != target_page.site:
-            raise InterwikiRedirectPageError(self, target_page)
-        if not self.exists() and not (create or force):
-            raise NoPageError(self)
-        if self.exists() and not self.isRedirectPage() and not force:
-            raise IsNotRedirectPageError(self)
-        redirect_regex = self.site.redirect_regex
-        if self.exists():
-            old_text = self.get(get_redirect=True)
-        else:
-            old_text = ''
-        result = redirect_regex.search(old_text)
-        if result:
-            oldlink = result.group(1)
-            if (keep_section and '#' in oldlink
-                    and target_page.section() is None):
-                sectionlink = oldlink[oldlink.index('#'):]
-                target_page = pywikibot.Page(
-                    self.site,
-                    target_page.title() + sectionlink
-                )
-            prefix = self.text[:result.start()]
-            suffix = self.text[result.end():]
-        else:
-            prefix = ''
-            suffix = ''
-
-        target_link = target_page.title(as_link=True, textlink=True,
-                                        allow_interwiki=False)
-        target_link = '#{} {}'.format(self.site.redirect(), target_link)
-        self.text = prefix + target_link + suffix
-        if save:
-            self.save(**kwargs)
-
-    def get_best_claim(self, prop: str):
-        """
-        Return the first best Claim for this page.
-
-        Return the first 'preferred' ranked Claim specified by Wikibase
-        property or the first 'normal' one otherwise.
-
-        .. versionadded:: 3.0
-
-        :param prop: property id, "P###"
-        :return: Claim object given by Wikibase property number
-            for this page object.
-        :rtype: pywikibot.Claim or None
-
-        :raises UnknownExtensionError: site has no Wikibase extension
-        """
-        def find_best_claim(claims):
-            """Find the first best ranked claim."""
-            index = None
-            for i, claim in enumerate(claims):
-                if claim.rank == 'preferred':
-                    return claim
-                if index is None and claim.rank == 'normal':
-                    index = i
-            if index is None:
-                index = 0
-            return claims[index]
-
-        if not self.site.has_data_repository:
-            raise UnknownExtensionError(
-                'Wikibase is not implemented for {}.'.format(self.site))
-
-        def get_item_page(func, *args):
-            try:
-                item_p = func(*args)
-                item_p.get()
-                return item_p
-            except NoPageError:
-                return None
-            except IsRedirectPageError:
-                return get_item_page(item_p.getRedirectTarget)
-
-        item_page = get_item_page(pywikibot.ItemPage.fromPage, self)
-        if item_page and prop in item_page.claims:
-            return find_best_claim(item_page.claims[prop])
-        return None
-
-
-class Category(Page):
-
-    """A page in the Category: namespace."""
-
-    def __init__(self, source, title: str = '', sort_key=None) -> None:
-        """
-        Initializer.
-
-        All parameters are the same as for Page() Initializer.
-        """
-        self.sortKey = sort_key
-        super().__init__(source, title, ns=14)
-        if self.namespace() != 14:
-            raise ValueError("'{}' is not in the category namespace!"
-                             .format(self.title()))
-
-    def aslink(self, sort_key: Optional[str] = None) -> str:
-        """
-        Return a link to place a page in this Category.
-
-        Use this only to generate a "true" category link, not for interwikis
-        or text links to category pages.
-
-        :param sort_key: The sort key for the article to be placed in this
-            Category; if omitted, default sort key is used.
-        """
-        key = sort_key or self.sortKey
-        if key is not None:
-            title_with_sort_key = self.title(with_section=False) + '|' + key
-        else:
-            title_with_sort_key = self.title(with_section=False)
-        return '[[{}]]'.format(title_with_sort_key)
-
-    def subcategories(self,
-                      recurse: Union[int, bool] = False,
-                      total: Optional[int] = None,
-                      content: bool = False):
-        """
-        Iterate all subcategories of the current category.
-
-        :param recurse: if not False or 0, also iterate subcategories of
-            subcategories. If an int, limit recursion to this number of
-            levels. (Example: recurse=1 will iterate direct subcats and
-            first-level sub-sub-cats, but no deeper.)
-        :param total: iterate no more than this number of
-            subcategories in total (at all levels)
-        :param content: if True, retrieve the content of the current version
-            of each category description page (default False)
-        """
-        if not isinstance(recurse, bool) and recurse:
-            recurse = recurse - 1
-
-        if not hasattr(self, '_subcats'):
-            self._subcats = []
-            for member in self.site.categorymembers(
-                    self, member_type='subcat', total=total, content=content):
-                subcat = Category(member)
-                self._subcats.append(subcat)
-                yield subcat
-                if total is not None:
-                    total -= 1
-                    if total == 0:
-                        return
-
-                if recurse:
-                    for item in subcat.subcategories(
-                            recurse, total=total, content=content):
-                        yield item
-                        if total is None:
-                            continue
-
-                        total -= 1
-                        if total == 0:
-                            return
-        else:
-            for subcat in self._subcats:
-                yield subcat
-                if total is not None:
-                    total -= 1
-                    if total == 0:
-                        return
-
-                if recurse:
-                    for item in subcat.subcategories(
-                            recurse, total=total, content=content):
-                        yield item
-                        if total is None:
-                            continue
-
-                        total -= 1
-                        if total == 0:
-                            return
-
-    def articles(self,
-                 recurse: Union[int, bool] = False,
-                 total: Optional[int] = None,
-                 content: bool = False,
-                 namespaces: Union[int, List[int]] = None,
-                 sortby: Optional[str] = None,
-                 reverse: bool = False,
-                 starttime=None, endtime=None,
-                 startprefix: Optional[str] = None,
-                 endprefix: Optional[str] = None):
-        """
-        Yield all articles in the current category.
-
-        By default, yields all *pages* in the category that are not
-        subcategories!
-
-        :param recurse: if not False or 0, also iterate articles in
-            subcategories. If an int, limit recursion to this number of
-            levels. (Example: recurse=1 will iterate articles in first-level
-            subcats, but no deeper.)
-        :param total: iterate no more than this number of pages in
-            total (at all levels)
-        :param namespaces: only yield pages in the specified namespaces
-        :param content: if True, retrieve the content of the current version
-            of each page (default False)
-        :param sortby: determines the order in which results are generated,
-            valid values are "sortkey" (default, results ordered by category
-            sort key) or "timestamp" (results ordered by time page was
-            added to the category). This applies recursively.
-        :param reverse: if True, generate results in reverse order
-            (default False)
-        :param starttime: if provided, only generate pages added after this
-            time; not valid unless sortby="timestamp"
-        :type starttime: pywikibot.Timestamp
-        :param endtime: if provided, only generate pages added before this
-            time; not valid unless sortby="timestamp"
-        :type endtime: pywikibot.Timestamp
-        :param startprefix: if provided, only generate pages >= this title
-            lexically; not valid if sortby="timestamp"
-        :param endprefix: if provided, only generate pages < this title
-            lexically; not valid if sortby="timestamp"
-        :rtype: typing.Iterable[pywikibot.Page]
-        """
-        seen = set()
-        for member in self.site.categorymembers(self,
-                                                namespaces=namespaces,
-                                                total=total,
-                                                content=content,
-                                                sortby=sortby,
-                                                reverse=reverse,
-                                                starttime=starttime,
-                                                endtime=endtime,
-                                                startprefix=startprefix,
-                                                endprefix=endprefix,
-                                                member_type=['page', 'file']):
-            if recurse:
-                seen.add(hash(member))
-            yield member
-            if total is not None:
-                total -= 1
-                if total == 0:
-                    return
-
-        if recurse:
-            if not isinstance(recurse, bool) and recurse:
-                recurse -= 1
-            for subcat in self.subcategories():
-                for article in subcat.articles(recurse=recurse,
-                                               total=total,
-                                               content=content,
-                                               namespaces=namespaces,
-                                               sortby=sortby,
-                                               reverse=reverse,
-                                               starttime=starttime,
-                                               endtime=endtime,
-                                               startprefix=startprefix,
-                                               endprefix=endprefix):
-                    hash_value = hash(article)
-                    if hash_value in seen:
-                        continue
-
-                    seen.add(hash_value)
-                    yield article
-                    if total is None:
-                        continue
-
-                    total -= 1
-                    if total == 0:
-                        return
-
-    def members(self, recurse: bool = False,
-                namespaces=None,
-                total: Optional[int] = None,
-                content: bool = False):
-        """Yield all category contents (subcats, pages, and files).
-
-        :rtype: typing.Iterable[pywikibot.Page]
-        """
-        for member in self.site.categorymembers(
-                self, namespaces=namespaces, total=total, content=content):
-            yield member
-            if total is not None:
-                total -= 1
-                if total == 0:
-                    return
-        if recurse:
-            if not isinstance(recurse, bool) and recurse:
-                recurse = recurse - 1
-            for subcat in self.subcategories():
-                for article in subcat.members(
-                        recurse, namespaces, total=total, content=content):
-                    yield article
-                    if total is None:
-                        continue
-
-                    total -= 1
-                    if total == 0:
-                        return
-
-    def isEmptyCategory(self) -> bool:
-        """Return True if category has no members (including subcategories)."""
-        ci = self.categoryinfo
-        return sum(ci[k] for k in ['files', 'pages', 'subcats']) == 0
-
-    def isHiddenCategory(self) -> bool:
-        """Return True if the category is hidden."""
-        return 'hiddencat' in self.properties()
-
-    @property
-    def categoryinfo(self) -> dict:
-        """
-        Return a dict containing information about the category.
-
-        The dict contains values for:
-
-        Numbers of pages, subcategories, files, and total contents.
-        """
-        return self.site.categoryinfo(self)
-
-    def newest_pages(
-        self,
-        total: Optional[int] = None
-    ) -> Generator[Page, None, None]:
-        """
-        Return pages in a category ordered by the creation date.
-
-        If two or more pages are created at the same time, the pages are
-        returned in the order they were added to the category. The most
-        recently added page is returned first.
-
-        It only allows to return the pages ordered from newest to oldest, as it
-        is impossible to determine the oldest page in a category without
-        checking all pages. But it is possible to check the category in order
-        with the newly added first and it yields all pages which were created
-        after the currently checked page was added (and thus there is no page
-        created after any of the cached but added before the currently
-        checked).
-
-        :param total: The total number of pages queried.
-        :return: A page generator of all pages in a category ordered by the
-            creation date. From newest to oldest.
-
-            .. note:: It currently only returns Page instances and not a
-               subclass of it if possible. This might change so don't
-               expect to only get Page instances.
-        """
-        def check_cache(latest):
-            """Return the cached pages in order and not more than total."""
-            cached = []
-            for timestamp in sorted((ts for ts in cache if ts > latest),
-                                    reverse=True):
-                # The complete list can be removed, it'll either yield all of
-                # them, or only a portion but will skip the rest anyway
-                cached += cache.pop(timestamp)[:None if total is None else
-                                               total - len(cached)]
-                if total and len(cached) >= total:
-                    break  # already got enough
-            assert total is None or len(cached) <= total, \
-                'Number of caches is more than total number requested'
-            return cached
-
-        # all pages which have been checked but where created before the
-        # current page was added, at some point they will be created after
-        # the current page was added. It saves all pages via the creation
-        # timestamp. Be prepared for multiple pages.
-        cache = defaultdict(list)
-        # TODO: Make site.categorymembers is usable as it returns pages
-        # There is no total defined, as it's not known how many pages need to
-        # be checked before the total amount of new pages was found. In worst
-        # case all pages of a category need to be checked.
-        for member in pywikibot.data.api.QueryGenerator(
-            site=self.site, parameters={
-                'list': 'categorymembers', 'cmsort': 'timestamp',
-                'cmdir': 'older', 'cmprop': 'timestamp|title',
-                'cmtitle': self.title()}):
-            # TODO: Upcast to suitable class
-            page = pywikibot.Page(self.site, member['title'])
-            assert page.namespace() == member['ns'], \
-                'Namespace of the page is not consistent'
-            cached = check_cache(pywikibot.Timestamp.fromISOformat(
-                member['timestamp']))
-            yield from cached
-            if total is not None:
-                total -= len(cached)
-                if total <= 0:
-                    break
-            cache[page.oldest_revision.timestamp] += [page]
-        else:
-            # clear cache
-            assert total is None or total > 0, \
-                'As many items as given in total already returned'
-            yield from check_cache(pywikibot.Timestamp.min)

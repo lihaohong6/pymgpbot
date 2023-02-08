@@ -1,34 +1,36 @@
-pywikibot.data package
-======================
+*****************************
+:mod:`data` --- Data Exchange
+*****************************
 
-.. automodule:: pywikibot.data
+.. automodule:: data
+   :synopsis: Data Exchange
 
-Submodules
-----------
+:mod:`data.api` --- MediaWiki API Requests
+==========================================
 
-pywikibot.data.api module
--------------------------
+.. automodule:: data.api
+   :synopsis: Module providing several layers of data access to the wiki
 
-.. automodule:: pywikibot.data.api
+:mod:`data.memento` --- Memento Requests
+========================================
 
-pywikibot.data.memento module
------------------------------
+.. automodule:: data.memento
+   :synopsis: Fix ups for memento-client package version 0.6.1
 
-.. automodule:: pywikibot.data.memento
+:mod:`data.mysql` --- Mysql Requests
+====================================
 
-pywikibot.data.mysql module
----------------------------
+.. automodule:: data.mysql
+   :synopsis: Miscellaneous helper functions for mysql queries
 
-.. automodule:: pywikibot.data.mysql
+:mod:`data.sparql` --- SPARQL requests
+======================================
 
-pywikibot.data.sparql module
-----------------------------
+.. automodule:: data.sparql
+   :synopsis: SPARQL Query interface
 
-.. automodule:: pywikibot.data.sparql
+:mod:`data.wikistats` --- WikiStats requests
+============================================
 
-pywikibot.data.wikistats module
--------------------------------
-
-.. automodule:: pywikibot.data.wikistats
-
-
+.. automodule:: data.wikistats
+   :synopsis: Objects representing WikiStats API

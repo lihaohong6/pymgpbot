@@ -1,22 +1,31 @@
-pywikibot.page package
-=======================
+*******************************
+:mod:`page` --- MediaWiki Pages
+*******************************
 
-.. automodule:: pywikibot.page
+.. automodule:: page
+   :synopsis: Interface of various types of MediaWiki pages
 
-Submodules
-----------
-
-pywikibot.page.\_collections module
------------------------------------
+:mod:`page.\_collections` Wikibase Entity Structures
+====================================================
 
 .. automodule:: pywikibot.page._collections
+   :synopsis: Structures holding data for Wikibase entities
 
-pywikibot.page.\_decorators module
-----------------------------------
+:mod:`page.\_decorators` --- Page Decorators
+============================================
 
-.. automodule:: pywikibot.page._decorators
+.. automodule:: page._decorators
+   :synopsis: Decorators for Page objects
+   :private-members:
 
-pywikibot.page.\_revision module
---------------------------------
+:mod:`page.\_revision` --- Page Revision
+========================================
 
-.. automodule:: pywikibot.page._revision
+.. automodule:: page._revision
+   :synopsis: Object representing page revision
+
+:mod:`page.\_toolforge` module
+==============================
+
+.. automodule:: page._toolforge
+   :synopsis: Object representing interface to toolforge tools

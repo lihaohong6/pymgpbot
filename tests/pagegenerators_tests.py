@@ -15,7 +15,11 @@ from unittest import mock
 
 import pywikibot
 from pywikibot import date, pagegenerators
-from pywikibot.exceptions import ServerError, UnknownExtensionError
+from pywikibot.exceptions import (
+    NoPageError,
+    ServerError,
+    UnknownExtensionError,
+)
 from pywikibot.pagegenerators import (
     CategorizedPageGenerator,
     PagesFromTitlesGenerator,
@@ -32,6 +36,7 @@ from tests.aspects import (
     WikidataTestCase,
 )
 from tests.tools_tests import GeneratorIntersectTestCase
+from tests.utils import skipping
 
 
 en_wp_page_titles = (
@@ -173,7 +178,7 @@ class TestDryPageGenerators(TestCase):
                                                       site=self.site)
         pages = []
         for p in gen:
-            p.text = 'This is the content of {} as a sample'.format(p.title())
+            p.text = f'This is the content of {p.title()} as a sample'
             pages.append(p)
         gen = pagegenerators.RegexBodyFilterPageGenerator(iter(pages), '/doc')
         self.assertPageTitlesEqual(gen,
@@ -372,12 +377,10 @@ class PetScanPageGeneratorTestCase(TestCase):
         site = self.get_site()
         gen = pagegenerators.PetScanPageGenerator(['Pywikibot Protect Test'],
                                                   True, None, site)
-        try:
+        with skipping(ServerError):
             self.assertPageTitlesEqual(gen, titles=(
                 'User:Sn1per/ProtectTest1', 'User:Sn1per/ProtectTest2'),
                 site=site)
-        except ServerError as e:
-            self.skipTest(e)
 
         gen = pagegenerators.PetScanPageGenerator(['Pywikibot Protect Test'],
                                                   False, None, site)
@@ -1141,7 +1144,7 @@ class TestFactoryGenerator(DefaultSiteTestCase):
 
         # Get by pageids.
         gf = pagegenerators.GeneratorFactory(site=self.get_site())
-        gf.handle_arg('-pageid:{}'.format(pageids))
+        gf.handle_arg(f'-pageid:{pageids}')
         gen = gf.getCombinedGenerator()
         self.assertIsNotNone(gen)
         pages_from_pageid = list(gen)
@@ -1221,7 +1224,7 @@ class TestFactoryGenerator(DefaultSiteTestCase):
                      'hiddencat', 'invalid_property'):
             if item in mysite.get_property_names():
                 gf = pagegenerators.GeneratorFactory()
-                gf.handle_arg('-property:{}'.format(item))
+                gf.handle_arg(f'-property:{item}')
                 gf.handle_arg('-limit:10')
                 gen = gf.getCombinedGenerator()
                 self.assertIsNotNone(gen)
@@ -1235,7 +1238,7 @@ class TestFactoryGenerator(DefaultSiteTestCase):
                 with self.assertRaises(NotImplementedError):
                     mysite.pages_with_property(item)
                     self.fail(
-                        'NotImplementedError not raised for {}'.format(item))
+                        f'NotImplementedError not raised for {item}')
 
     def test_empty_generator(self):
         """Test empty generator."""
@@ -1641,7 +1644,7 @@ class EventStreamsPageGeneratorTestCase(RecentChangesTestCase):
         super().setUpClass()
         cls.client = 'sseclient'
         if not has_module(cls.client):
-            raise unittest.SkipTest('{} is not available'.format(cls.client))
+            raise unittest.SkipTest(f'{cls.client} is not available')
 
     def test_RC_pagegenerator_result(self):
         """Test RC pagegenerator."""
@@ -1680,18 +1683,16 @@ class TestUnconnectedPageGenerator(DefaultSiteTestCase):
         """Test UnconnectedPageGenerator."""
         if not self.site.data_repository():
             self.skipTest('Site is not using a Wikibase repository')
-        upgen = pagegenerators.UnconnectedPageGenerator(self.site, 3)
-        self.assertDictEqual(
-            upgen.request._params, {
-                'gqppage': ['UnconnectedPages'],
-                'prop': ['info', 'imageinfo', 'categoryinfo'],
-                'inprop': ['protection'],
-                'iilimit': ['max'],
-                'iiprop': ['timestamp', 'user', 'comment', 'url', 'size',
-                           'sha1', 'metadata'],
-                'generator': ['querypage'], 'action': ['query'],
-                'indexpageids': [True], 'continue': [True]})
-        self.assertLessEqual(len(tuple(upgen)), 3)
+        pages = list(pagegenerators.UnconnectedPageGenerator(self.site, 3))
+        self.assertLessEqual(len(pages), 3)
+
+        site = self.site.data_repository()
+        pattern = (fr'Page \[\[({site.sitename}:|{site.code}:)-1\]\]'
+                   r" doesn't exist\.")
+        for page in pages:
+            with self.subTest(page=page), self.assertRaisesRegex(
+                    NoPageError, pattern):
+                page.data_item()
 
     def test_unconnected_without_repo(self):
         """Test that it raises a ValueError on sites without repository."""
@@ -1700,7 +1701,8 @@ class TestUnconnectedPageGenerator(DefaultSiteTestCase):
         with self.assertRaises(ValueError):
             for _ in pagegenerators.UnconnectedPageGenerator(self.site,
                                                              total=5):
-                raise AssertionError("this shouldn't be reached")
+                raise AssertionError(
+                    "this shouldn't be reached")  # pragma: no cover
 
 
 class TestLinksearchPageGenerator(TestCase):
@@ -1719,7 +1721,7 @@ class TestLinksearchPageGenerator(TestCase):
 
         for search, expected in cases:
             gf = pagegenerators.GeneratorFactory(site=self.site)
-            gf.handle_arg('-weblink:{}'.format(search))
+            gf.handle_arg(f'-weblink:{search}')
             gf.handle_arg('-ns:2')
             gf.handle_arg('-limit:1')
             gen = gf.getCombinedGenerator()

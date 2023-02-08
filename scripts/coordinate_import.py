@@ -37,7 +37,7 @@ The following command line parameters are supported:
 -create           Create items for pages without one.
 
 .. note:: This script is a
-   :py:obj:`ConfigParserBot <pywikibot.bot.ConfigParserBot>`. All options
+   :py:obj:`ConfigParserBot <bot.ConfigParserBot>`. All options
    can be set within a settings file which is scripts.ini by default.
 
 &params;
@@ -99,15 +99,15 @@ class CoordImportRobot(ConfigParserBot, WikidataBot):
         """
         claims = item.get().get('claims')
         if self.prop in claims:
-            pywikibot.output('Item {} already contains coordinates ({})'
-                             .format(item.title(), self.prop))
+            pywikibot.info('Item {} already contains coordinates ({})'
+                           .format(item.title(), self.prop))
             return True
 
         prop = self.has_coord_qualifier(claims)
         if prop:
-            pywikibot.output('Item {} already contains coordinates'
-                             ' ({}) as qualifier for {}'
-                             .format(item.title(), self.prop, prop))
+            pywikibot.info(
+                'Item {} already contains coordinates ({}) as qualifier for {}'
+                .format(item.title(), self.prop, prop))
             return True
         return False
 
@@ -141,13 +141,13 @@ class CoordImportRobot(ConfigParserBot, WikidataBot):
         source = self.getSource(page.site)
         if source:
             newclaim.addSource(source)
-        pywikibot.output('Adding {}, {} to {}'.format(
+        pywikibot.info('Adding {}, {} to {}'.format(
             coordinate.lat, coordinate.lon, item.title()))
         # todo: handle exceptions using self.user_add_claim
         try:
             item.addClaim(newclaim)
         except CoordinateGlobeUnknownError as e:
-            pywikibot.output('Skipping unsupported globe: {}'.format(e.args))
+            pywikibot.info(f'Skipping unsupported globe: {e.args}')
             return False
         else:
             return True

@@ -1,6 +1,6 @@
 """Family module for Wikiquote."""
 #
-# (C) Pywikibot team, 2005-2022
+# (C) Pywikibot team, 2005-2023
 #
 # Distributed under the terms of the MIT license.
 #
@@ -27,12 +27,13 @@ class Family(family.SubdomainFamily, family.WikimediaFamily):
     ]
 
     languages_by_size = [
-        'it', 'en', 'pl', 'ru', 'cs', 'et', 'fa', 'pt', 'uk', 'de', 'fr', 'he',
-        'es', 'tr', 'sk', 'eo', 'bs', 'ca', 'az', 'fi', 'sl', 'lt', 'zh', 'ar',
-        'bg', 'hy', 'hr', 'el', 'su', 'nn', 'id', 'sv', 'li', 'hu', 'sr', 'ko',
-        'nl', 'ja', 'sah', 'la', 'ta', 'gu', 'gl', 'ur', 'be', 'te', 'cy',
-        'vi', 'no', 'ml', 'sq', 'kn', 'hi', 'eu', 'ro', 'ku', 'uz', 'ka', 'da',
-        'sa', 'is', 'br', 'mr', 'af', 'th', 'wo', 'ky',
+        'it', 'en', 'pl', 'ru', 'cs', 'et', 'pt', 'fa', 'uk', 'de', 'he', 'fr',
+        'es', 'eo', 'tr', 'sk', 'bs', 'az', 'ca', 'fi', 'sr', 'sl', 'zh', 'lt',
+        'ar', 'bg', 'hy', 'hr', 'su', 'el', 'nn', 'id', 'sv', 'li', 'hu', 'ko',
+        'nl', 'sah', 'ja', 'la', 'ta', 'gl', 'gu', 'hi', 'ur', 'ig', 'be',
+        'te', 'guw', 'tl', 'vi', 'cy', 'no', 'sq', 'ml', 'bn', 'kn', 'ro',
+        'eu', 'ku', 'as', 'uz', 'ka', 'da', 'sa', 'is', 'bcl', 'br', 'mr',
+        'af', 'th', 'wo', 'ky',
     ]
 
     category_redirect_templates = {

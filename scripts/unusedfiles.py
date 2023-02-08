@@ -9,7 +9,7 @@ Parameters:
                 If not used, all pages are used.
 -always         Don't be asked every time.
 
-This script is a :py:obj:`ConfigParserBot <pywikibot.bot.ConfigParserBot>`.
+This script is a :py:obj:`ConfigParserBot <bot.ConfigParserBot>`.
 The following options can be set within a settings file which is scripts.ini
 by default::
 
@@ -111,13 +111,13 @@ class UnusedFilesBot(SingleSiteBot,
         if (image.get_file_url() and not image.file_is_shared()
                 and 'http://' not in image.text):
             if self.opt.filetemplate in image.text:
-                pywikibot.output('{} done already'
-                                 .format(image.title(as_link=True)))
+                pywikibot.info(f'{image} done already')
                 return
 
             self.append_text(image, '\n\n' + self.opt.filetemplate)
             if self.opt.nouserwarning:
                 return
+
             uploader = image.oldest_file_info.user
             user = pywikibot.User(image.site, uploader)
             usertalkpage = user.getUserTalkPage()
@@ -145,7 +145,8 @@ class UnusedFilesBot(SingleSiteBot,
         self.current_page = page
         self.put_current(text)
 
-    def post_to_flow_board(self, page, post) -> None:
+    @staticmethod
+    def post_to_flow_board(page, post) -> None:
         """Post message as a Flow topic."""
         board = Board(page)
         header, rest = post.split('\n', 1)

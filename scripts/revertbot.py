@@ -43,6 +43,7 @@ from typing import Union
 
 import pywikibot
 from pywikibot import i18n
+from pywikibot.backports import Container
 from pywikibot.bot import OptionHandler
 from pywikibot.date import format_date, formatYear
 from pywikibot.exceptions import APIError, Error
@@ -81,13 +82,14 @@ class BaseRevertBot(OptionHandler):
             if callback(item):
                 result = self.revert(item)
                 if result:
-                    self.log('{}: {}'.format(item['title'], result))
+                    pywikibot.info('{}: {}'.format(item['title'], result))
                 else:
-                    self.log('Skipped {}'.format(item['title']))
+                    pywikibot.info('Skipped {}'.format(item['title']))
             else:
-                self.log('Skipped {} by callback'.format(item['title']))
+                pywikibot.info('Skipped {} by callback'.format(item['title']))
 
-    def callback(self, item) -> bool:
+    @staticmethod
+    def callback(item: Container) -> bool:
         """Callback function."""
         return 'top' in item
 
@@ -110,10 +112,9 @@ class BaseRevertBot(OptionHandler):
 
         rev = history[1]
 
-        pywikibot.output('\n\n>>> <<lightpurple>>{0}<<default>> <<<'
-                         .format(page.title(as_link=True,
-                                            force_interwiki=True,
-                                            textlink=True)))
+        pywikibot.info('\n\n>>> <<lightpurple>>{}<<default>> <<<'
+                       .format(page.title(as_link=True, force_interwiki=True,
+                                          textlink=True)))
 
         if not self.opt.rollback:
             comment = i18n.twtranslate(
@@ -145,10 +146,6 @@ class BaseRevertBot(OptionHandler):
 
         pywikibot.exception(exc_info=False)
         return False
-
-    def log(self, msg) -> None:
-        """Log the message msg."""
-        pywikibot.output(msg)
 
 
 # for compatibility only

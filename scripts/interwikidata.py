@@ -25,7 +25,7 @@ Furthermore, the following command line parameters are supported:
 -summary:         Use your own edit summary for cleaning the page.
 
 .. note:: This script is a
-   :py:obj:`ConfigParserBot <pywikibot.bot.ConfigParserBot>`. All options
+   :py:obj:`ConfigParserBot <bot.ConfigParserBot>`. All options
    can be set within a settings file which is scripts.ini by default.
 """
 
@@ -143,7 +143,7 @@ class IWBot(ConfigParserBot, ExistingPageBot, SingleSiteBot):
 
         item = pywikibot.ItemPage(self.repo)
         item.editEntity(data, new='item', summary=summary)
-        output('Created item {item}'.format(item=item.getID()))
+        output(f'Created item {item.getID()}')
         return item
 
     def handle_complicated(self) -> bool:

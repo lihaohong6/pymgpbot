@@ -1,6 +1,6 @@
 """Family module for Wikisource."""
 #
-# (C) Pywikibot team, 2004-2022
+# (C) Pywikibot team, 2004-2023
 #
 # Distributed under the terms of the MIT license.
 #
@@ -25,12 +25,12 @@ class Family(family.SubdomainFamily, family.WikimediaFamily):
     ]
 
     languages_by_size = [
-        'pl', 'en', 'ru', 'de', 'fr', 'zh', 'he', 'it', 'es', 'uk', 'ar', 'cs',
-        'mul', 'gu', 'sr', 'pt', 'fa', 'sv', 'bn', 'hu', 'ko', 'ml', 'sa',
-        'ta', 'te', 'sl', 'tr', 'hy', 'la', 'el', 'vi', 'ja', 'ro', 'fi',
-        'nap', 'nl', 'az', 'ca', 'br', 'kn', 'no', 'hr', 'be', 'th', 'id',
-        'eo', 'hi', 'is', 'vec', 'pms', 'ban', 'mr', 'lij', 'da', 'et', 'cy',
-        'mk', 'as', 'yi', 'bg', 'li', 'lt', 'jv', 'wa', 'pa', 'eu', 'or', 'gl',
+        'pl', 'en', 'ru', 'de', 'fr', 'zh', 'he', 'it', 'uk', 'es', 'ar',
+        'mul', 'cs', 'gu', 'sr', 'pt', 'fa', 'sv', 'bn', 'hu', 'ko', 'ta',
+        'ml', 'sa', 'te', 'sl', 'tr', 'hy', 'la', 'vi', 'el', 'ja', 'ro', 'fi',
+        'nap', 'nl', 'be', 'az', 'ca', 'br', 'kn', 'no', 'hr', 'id', 'th',
+        'eo', 'hi', 'is', 'vec', 'pms', 'cy', 'ban', 'mr', 'lij', 'da', 'et',
+        'mk', 'as', 'yi', 'bg', 'wa', 'li', 'jv', 'lt', 'pa', 'eu', 'or', 'gl',
         'bs', 'sah', 'sk', 'zh-min-nan', 'fo',
     ]
 
@@ -68,7 +68,7 @@ class Family(family.SubdomainFamily, family.WikimediaFamily):
     @classproperty
     def code_aliases(cls):
         cls.code_aliases = super().code_aliases.copy()
-        aliases = cls.alphabetic + ['-', 'www']
+        aliases = cls.known_codes + ['-', 'www']
         for code in aliases:
             if (code not in cls.languages_by_size
                     and code not in cls.closed_wikis

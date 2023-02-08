@@ -1,10 +1,126 @@
 Scripts Changelog
 =================
 
+8.0.0
+-----
+
+blockpageschecker
+~~~~~~~~~~~~~~~~~
+
+* Fix neutral additive element
+
+category
+~~~~~~~~
+
+* Enable pagegenerators options with ``move`` and ``remove`` actions (:phab:`T318239`)
+
+category_graph
+~~~~~~~~~~~~~~
+
+* :mod:`category_graph` script was added which creates category graph in formats dot, svg and html5
+
+clean_sandbox
+~~~~~~~~~~~~~
+
+* L10N updates
+* A `-textfile` option was addet to fetch the text from a file
+
+create_isbn_edition
+~~~~~~~~~~~~~~~~~~~
+
+* Fix argument parsing
+
+fixing_redirects
+~~~~~~~~~~~~~~~~
+
+* Skip invalid link titles (:phab:`T324434`)
+
+interwiki
+~~~~~~~~~
+
+Fix string concatenation (:phab:`T322180`)
+
+touch
+~~~~~
+
+Provide bulk purge to run upto 1000 times faster
+
+
+7.7.0
+-----
+
+archivebot
+~~~~~~~~~~
+
+* Process pages in parallel tasks with ``-async`` option (:phab:`T57899`)
+* Add -sort option to sort archives by (latest) timestamp
+* Archive unsigned threads using timestamp of the next thread (:phab:`T69663`, :phab:`T182685`)
+
+category_redirect
+~~~~~~~~~~~~~~~~~
+
+* Use localized template prefix (:phab:`T318049`)
+
+create_isbn_edition
+~~~~~~~~~~~~~~~~~~~
+
+* New script to load ISBN related data into Wikidata (:phab:`T314942`)
+
+watchlist
+~~~~~~~~~
+
+* Watchlist is retrieved faster in parallel tasks (:phab:`T57899`)
+* Enable watchlist.refresh_all for API generator access (:phab:`T316359`)
+
+7.6.0
+-----
+
+*21 August 2022*
+
+archivebot
+~~~~~~~~~~
+
+* Use ``User:MiszaBot/config`` as default template
+* Raise MalformedConfigError if 'maxarchivesize' is 0 (:phab:`T313886`)
+* Preserve thread order in archive even if threads are archived later (:phab:`T312773`, :phab:`T314560`)
+* Skip the page if it does not exist
+* Fix for DiscussionPage.size() (:phab:`T313886`)
+* Decrease memory usage and improve processing speed
+
+interwiki
+~~~~~~~~~
+
+* Fix wrong Subject property
+
+pagefromfile
+~~~~~~~~~~~~
+
+* Derive PageFromFileReader from tools.collections.GeneratorWrapper
+
+7.5.2
+-----
+
+*26 July 2022*
+
+archivebot
+~~~~~~~~~~
+
+* Add localized "archive" variables  (:phab:`T71551`, :phab:`T313682`, :phab:`T313692`)
+
+7.5.1
+-----
+
+*24 July 2022*
+
+archivebot
+~~~~~~~~~~
+
+* Replace archive pattern fields to string conversion (:phab:`T313692`)
+
 7.5.0
 -----
 
-*current release*
+*22 July 2022*
 
 harvest_template
 ~~~~~~~~~~~~~~~~

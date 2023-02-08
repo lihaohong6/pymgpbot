@@ -64,7 +64,7 @@ class BaseDataDict(MutableMapping):
         return key in self._data
 
     def __repr__(self) -> str:
-        return '{}({})'.format(type(self), self._data)
+        return f'{type(self)}({self._data})'
 
     @staticmethod
     def normalizeKey(key) -> str:
@@ -149,8 +149,12 @@ class AliasesDict(BaseDataDict):
     def normalizeData(cls, data: dict) -> dict:
         """Helper function to expand data into the Wikibase API structure.
 
+        .. versionchanged:: 7.7
+           raises TypeError if *data* value is not a list.
+
         :param data: Data to normalize
         :return: The dict with normalized data
+        :raises TypeError: data values must be a list
         """
         norm_data = {}
         for key, values in data.items():
@@ -162,6 +166,11 @@ class AliasesDict(BaseDataDict):
                     else:
                         strings.append(value)
                 norm_data[key] = strings
+            else:
+                raise TypeError(
+                    "Unsupported value type {!r} for '{}'; list expected."
+                    .format(type(values).__name__, values))
+
         return norm_data
 
     def toJSON(self, diffto: Optional[dict] = None) -> dict:
@@ -230,7 +239,7 @@ class ClaimCollection(MutableMapping):
         return key in self._data
 
     def __repr__(self) -> str:
-        return '{}({})'.format(type(self), self._data)
+        return f'{type(self)}({self._data})'
 
     @classmethod
     def normalizeData(cls, data) -> dict:
@@ -258,17 +267,18 @@ class ClaimCollection(MutableMapping):
         if not diffto:
             return claims
 
-        temp = defaultdict(list)
-        props_add = set(claims.keys())
-        props_orig = set(diffto.keys())
+        diff_claims = defaultdict(list)
+        props_add = set(claims)
+        props_orig = set(diffto)
         for prop in (props_orig | props_add):
             if prop not in props_orig:
-                temp[prop].extend(claims[prop])
+                diff_claims[prop].extend(claims[prop])
                 continue
 
             if prop not in props_add:
-                temp[prop].extend({'id': claim['id'], 'remove': ''}
-                                  for claim in diffto[prop] if 'id' in claim)
+                diff_claims[prop].extend(
+                    {'id': claim['id'], 'remove': ''}
+                    for claim in diffto[prop] if 'id' in claim)
                 continue
 
             claim_ids = set()
@@ -277,24 +287,25 @@ class ClaimCollection(MutableMapping):
 
             for claim, json in zip(self[prop], claims[prop]):
                 if 'id' not in json:
-                    temp[prop].append(json)
+                    diff_claims[prop].append(json)
                     continue
 
                 claim_ids.add(json['id'])
                 if json['id'] in claim_map:
                     other = pywikibot.page.Claim.fromJSON(
                         self.repo, claim_map[json['id']])
+
                     if claim.same_as(other, ignore_rank=False,
                                      ignore_refs=False):
                         continue
-                temp[prop].append(json)
+
+                diff_claims[prop].append(json)
 
             for claim in diffto[prop]:
                 if 'id' in claim and claim['id'] not in claim_ids:
-                    temp[prop].append({'id': claim['id'], 'remove': ''})
+                    diff_claims[prop].append({'id': claim['id'], 'remove': ''})
 
-        claims = temp
-        return claims
+        return diff_claims
 
     def set_on_item(self, item) -> None:
         """Set Claim.on_item attribute for all claims in this collection."""

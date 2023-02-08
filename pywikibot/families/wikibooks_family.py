@@ -1,6 +1,6 @@
 """Family module for Wikibooks."""
 #
-# (C) Pywikibot team, 2005-2022
+# (C) Pywikibot team, 2005-2023
 #
 # Distributed under the terms of the MIT license.
 #
@@ -30,12 +30,12 @@ class Family(family.SubdomainFamily, family.WikimediaFamily):
 
     languages_by_size = [
         'en', 'hu', 'de', 'vi', 'fr', 'it', 'ja', 'pt', 'es', 'nl', 'pl', 'id',
-        'he', 'fi', 'zh', 'sq', 'az', 'fa', 'ru', 'ca', 'eu', 'th', 'da', 'ko',
-        'ba', 'sv', 'gl', 'cs', 'sr', 'hi', 'uk', 'hr', 'no', 'tr', 'sa', 'ar',
-        'ta', 'eo', 'sk', 'is', 'bn', 'ro', 'si', 'bg', 'ms', 'mk', 'ka', 'tt',
-        'lt', 'el', 'li', 'sl', 'tl', 'et', 'ur', 'km', 'la', 'mr', 'kk', 'te',
-        'be', 'ia', 'ml', 'oc', 'hy', 'ne', 'pa', 'cv', 'tg', 'ku', 'fy', 'af',
-        'bs', 'cy', 'mg', 'ky',
+        'he', 'fi', 'zh', 'fa', 'sq', 'az', 'ru', 'ca', 'eu', 'th', 'cs', 'da',
+        'ko', 'ba', 'sv', 'gl', 'hi', 'sr', 'uk', 'hr', 'no', 'tr', 'sa', 'ar',
+        'ta', 'bn', 'eo', 'sk', 'is', 'ro', 'shn', 'si', 'bg', 'ms', 'mk',
+        'ka', 'tt', 'lt', 'el', 'li', 'sl', 'tl', 'ur', 'km', 'la', 'mr', 'kk',
+        'te', 'et', 'be', 'ia', 'ml', 'oc', 'ne', 'hy', 'pa', 'cv', 'tg', 'ku',
+        'fy', 'af', 'bs', 'cy', 'mg', 'ky',
     ]
 
     category_redirect_templates = {

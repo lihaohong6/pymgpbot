@@ -18,24 +18,22 @@
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
+# documentation root, use Path.resolve() to make it absolute, like shown here.
 #
 import os
 import re
 import sys
 import warnings
-from os.path import abspath, dirname, join
+from pathlib import Path
 
 
-# Deprecated classes will generate warnings as Sphinx processes them. Ignoring
-# them.
+# Deprecated classes will generate warnings as Sphinx processes them.
+# Ignoring them.
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-docs_dir = dirname(__file__)
-repo_dir = abspath(join(docs_dir, '..'))
-sys.path.insert(0, repo_dir)
-os.chdir(repo_dir)
+repo_dir = Path(__file__).resolve().parents[1]
+sys.path = [str(repo_dir), str(repo_dir / 'pywikibot')] + sys.path
 
 os.environ['PYWIKIBOT_NO_USER_CONFIG'] = '1'
 import pywikibot  # noqa: E402
@@ -45,7 +43,7 @@ import pywikibot  # noqa: E402
 
 # If your documentation needs a minimal Sphinx version, state it here.
 #
-needs_sphinx = '4.5'
+needs_sphinx = '5.2.3'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
@@ -53,15 +51,15 @@ needs_sphinx = '4.5'
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosectionlabel',
+    'sphinx.ext.autosummary',
     'sphinx.ext.extlinks',
+    # 'sphinx.ext.intersphinx',
+    'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.napoleon',
+    'sphinxext.opengraph',
 ]
 
-# Allow lines like "Example:" to be followed by a code block
-napoleon_use_admonition_for_examples = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -69,19 +67,20 @@ templates_path = ['_templates']
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-source_suffix = ['.rst', '.md']
+# source_suffix = ['.rst', '.md']
+source_suffix = '.rst'
 
 # The encoding of source files.
 #
 # source_encoding = 'utf-8-sig'
 
 # The master toctree document.
-master_doc = 'index'
+root_doc = 'index'
 
 # General information about the project.
 project = pywikibot.__name__.title()
 project_copyright = pywikibot.__copyright__  # alias since Python 3.5
-# author = 'test'
+author = 'Pywikibot Team'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -97,7 +96,7 @@ release = pywikibot.__version__
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
@@ -116,7 +115,7 @@ exclude_patterns = ['_build']
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
 #
-default_role = 'code'
+default_role = 'py:obj'
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
 #
@@ -133,7 +132,8 @@ default_role = 'code'
 # show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = 'default'
+
 
 # A list of ignored prefixes for module index sorting.
 # modindex_common_prefix = []
@@ -142,7 +142,7 @@ pygments_style = 'sphinx'
 # keep_warnings = False
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
-# todo_include_todos = False
+todo_include_todos = True
 
 
 # -- Options for HTML output ----------------------------------------------
@@ -150,13 +150,13 @@ pygments_style = 'sphinx'
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'nature'
+html_theme = 'furo'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-# html_theme_options = {}
+
 
 # Add any paths that contain custom themes here, relative to this directory.
 # html_theme_path = []
@@ -184,7 +184,7 @@ html_favicon = '_static/Pywikibot.ico'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-# html_static_path = ['_static']
+html_static_path = ['_static']
 
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied
@@ -217,7 +217,99 @@ html_favicon = '_static/Pywikibot.ico'
 
 # If true, the index is split into individual pages for each letter.
 #
-# html_split_index = False
+html_split_index = True
+
+docs_url = 'https://gerrit.wikimedia.org/g/pywikibot/core/%2B/HEAD/docs/'
+
+# HTML Theme Colors
+# changed to match the palette as described on
+# https://meta.wikimedia.org/wiki/Brand/colours
+
+color_primary_blue = '#0C57A8'
+color_blue_bg_light = '#0C57A81B'
+color_blue_bg_dark = '#0C57A822'
+
+color_blue_text_dark = '#94D5FF'
+
+color_primary_red = '#990000'
+color_red_bg_light = '#99000011'
+color_red_bg_dark = '#99000014'
+
+color_red_text_dark = '#FF5151'
+
+color_primary_green = '#339966'
+color_green_bg_light = '#33996612'
+color_green_bg_dark = '#33996633'
+
+color_yellow = '#F0BC00'
+color_yellow_bg = '#F0BC0022'
+
+color_brightblue = '#049DFF'
+color_brightblue_bg = '#049DFF22'
+
+color_purple = '#5748B5'
+color_purple_bg = '#5748B52A'
+
+html_theme_options = {
+    'source_edit_link': docs_url + '{filename}',
+    'navigation_with_keys': True,
+    'light_css_variables': {
+        'color-brand-primary': color_primary_blue,
+        'color-link': color_primary_blue,
+        'color-link--hover': color_primary_blue,
+        'color-problematic': color_primary_red,
+        'color-admonition-title--note': color_primary_blue,
+        'color-admonition-title-background--note': color_blue_bg_light,
+        'color-admonition-title--seealso': color_primary_blue,
+        'color-admonition-title-background--seealso': color_blue_bg_light,
+        'color-admonition-title--caution': color_yellow,
+        'color-admonition-title-background--caution': color_yellow_bg,
+        'color-admonition-title--warning': color_yellow,
+        'color-admonition-title-background--warning': color_yellow_bg,
+        'color-admonition-title--danger': color_primary_red,
+        'color-admonition-title-background--danger': color_red_bg_light,
+        'color-admonition-title--error': color_primary_red,
+        'color-admonition-title-background--error': color_red_bg_light,
+        'color-admonition-title--attention': color_primary_red,
+        'color-admonition-title-background--attention': color_red_bg_light,
+        'color-admonition-title--hint': color_primary_green,
+        'color-admonition-title-background--hint': color_green_bg_light,
+        'color-admonition-title--tip': color_primary_green,
+        'color-admonition-title-background--tip': color_green_bg_light,
+        'color-admonition-title--important': color_brightblue,
+        'color-admonition-title-background--important': color_brightblue_bg,
+        'color-admonition-title': color_purple,
+        'color-admonition-title-background': color_purple_bg,
+    },
+    'dark_css_variables': {
+        'color-brand-primary': color_blue_text_dark,
+        'color-link': color_blue_text_dark,
+        'color-link--hover': color_blue_text_dark,
+        'color-problematic': color_red_text_dark,
+        'color-admonition-title--note': color_primary_blue,
+        'color-admonition-title-background--note': color_blue_bg_dark,
+        'color-admonition-title--seealso': color_primary_blue,
+        'color-admonition-title-background--seealso': color_blue_bg_dark,
+        'color-admonition-title--caution': color_yellow,
+        'color-admonition-title-background--caution': color_yellow_bg,
+        'color-admonition-title--warning': color_yellow,
+        'color-admonition-title-background--warning': color_yellow_bg,
+        'color-admonition-title--danger': color_primary_red,
+        'color-admonition-title-background--danger': color_red_bg_dark,
+        'color-admonition-title--error': color_primary_red,
+        'color-admonition-title-background--error': color_red_bg_dark,
+        'color-admonition-title--attention': color_primary_red,
+        'color-admonition-title-background--attention': color_red_bg_dark,
+        'color-admonition-title--hint': color_primary_green,
+        'color-admonition-title-background--hint': color_green_bg_dark,
+        'color-admonition-title--tip': color_primary_green,
+        'color-admonition-title-background--tip': color_green_bg_dark,
+        'color-admonition-title--important': color_brightblue,
+        'color-admonition-title-background--important': color_brightblue_bg,
+        'color-admonition-title': color_purple,
+        'color-admonition-title-background': color_purple_bg,
+    }
+}
 
 # If true, links to the reST sources are added to the pages.
 #
@@ -259,7 +351,7 @@ html_favicon = '_static/Pywikibot.ico'
 # html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'Pywikibotdoc'
+htmlhelp_basename = project + release.replace('.', '')
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -285,8 +377,8 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    ('index', 'Pywikibot.tex', 'Pywikibot Documentation',
-     'Pywikibot team', 'manual'),
+    (root_doc, 'Pywikibot.tex', 'Pywikibot Documentation',
+     author, 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -316,8 +408,8 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'pywikibot', 'Pywikibot Documentation',
-     ['Pywikibot team'], 1)
+    (root_doc, project, 'Pywikibot Documentation',
+     [author], 1)
 ]
 
 manpages_url = 'https://www.mediawiki.org/wiki/Manual:Pywikibot/{path}'
@@ -332,8 +424,8 @@ manpages_url = 'https://www.mediawiki.org/wiki/Manual:Pywikibot/{path}'
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    ('index', 'Pywikibot', 'Pywikibot Documentation',
-     'Pywikibot team', 'Pywikibot', 'One line description of project.',
+    (root_doc, project, 'Pywikibot Documentation',
+     author, project, 'One line description of project.',
      'Miscellaneous'),
 ]
 
@@ -353,12 +445,31 @@ texinfo_documents = [
 #
 # texinfo_no_detailmenu = False
 
+# If false, do not generate in manual @ref nodes.
+#
+# texinfo_cross_references = False
+
+numfig = True
+
 # Other settings
+show_authors = True
+todo_include_todos = True
 autodoc_typehints = 'description'
+# autosectionlabel_prefix_document = True
+suppress_warnings = ['autosectionlabel.*']
+toc_object_entries_show_parents = 'hide'
+
+# Allow lines like "Example:" to be followed by a code block
+napoleon_use_admonition_for_examples = True
+python_use_unqualified_type_names = True
+modindex_common_prefix = ['pywikibot.scripts.']
 
 # Pywikibot theme style
-html_static_path = ['_static']
-html_style = 'css/pywikibot.css'
+html_permalinks_icon = '#'
+html_css_files = [
+    'css/pywikibot.css',
+]
+
 
 extlinks = {
     # MediaWiki API
@@ -406,7 +517,7 @@ def pywikibot_script_docstring_fixups(app, what, name, obj, options, lines):
             lines[0] = '**{}**'.format(line.strip('.'))
         elif line == '&params;':
             lines[index] = ('This script supports use of '
-                            ':py:mod:`pywikibot.pagegenerators` arguments.')
+                            ':py:mod:`pagegenerators` arguments.')
         elif name == 'scripts.replace' and line == '&fixes-help;':
             lines[index] = ('                  The available fixes are listed '
                             'in :py:mod:`pywikibot.fixes`.')
@@ -426,7 +537,7 @@ def pywikibot_script_docstring_fixups(app, what, name, obj, options, lines):
             # Indent options
             match = re.match(r'-[^ ]+? +', line)
             if match:
-                length = len(match.group(0))
+                length = len(match[0])
             lines[index] = ' ' + line
         elif length and line.startswith(' ' * length):
             # Indent descriptions of options (as options are indented)

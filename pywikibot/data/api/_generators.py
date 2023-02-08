@@ -3,14 +3,14 @@
 .. versionchanged:: 7.6
    All Objects were changed from Iterable object to a Generator object.
    They are subclassed from
-   :class:`pywikibot.tools.collections.GeneratorWrapper`
+   :class:`tools.collections.GeneratorWrapper`
 """
 #
 # (C) Pywikibot team, 2008-2022
 #
 # Distributed under the terms of the MIT license.
 #
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
 from typing import Union
 from warnings import warn
 
@@ -18,6 +18,7 @@ import pywikibot
 from pywikibot import config
 from pywikibot.exceptions import Error, InvalidTitleError, UnsupportedPageError
 from pywikibot.tools.collections import GeneratorWrapper
+
 
 __all__ = (
     'APIGenerator',
@@ -41,10 +42,10 @@ class APIGeneratorBase(ABC):
     def _clean_kwargs(self, kwargs, **mw_api_args):
         """Clean kwargs, define site and request class."""
         if 'site' not in kwargs:
-            warn('{} invoked without a site'.format(self.__class__.__name__),
+            warn(f'{self.__class__.__name__} invoked without a site',
                  RuntimeWarning, 3)
             kwargs['site'] = pywikibot.Site()
-        assert(not hasattr(self, 'site') or self.site == kwargs['site'])
+        assert not hasattr(self, 'site') or self.site == kwargs['site']
         self.site = kwargs['site']
         self.request_class = kwargs['site']._request_class(kwargs)
         kwargs = self.request_class.clean_kwargs(kwargs)
@@ -72,7 +73,7 @@ class APIGenerator(APIGeneratorBase, GeneratorWrapper):
     after iterating that many values.
 
     .. versionchanged:: 7.6
-       subclassed from :class:`pywikibot.tools.collections.GeneratorWrapper`
+       subclassed from :class:`tools.collections.GeneratorWrapper`
     """
 
     def __init__(
@@ -198,7 +199,7 @@ class QueryGenerator(APIGeneratorBase, GeneratorWrapper):
     options.
 
     .. versionchanged:: 7.6
-       subclassed from :class:`pywikibot.tools.collections.GeneratorWrapper`
+       subclassed from :class:`tools.collections.GeneratorWrapper`
     """
 
     # Should results be filtered during iteration according to set_namespace?
@@ -604,13 +605,15 @@ class QueryGenerator(APIGeneratorBase, GeneratorWrapper):
         while True:
             prev_limit, new_limit = self._handle_query_limit(
                 prev_limit, new_limit, previous_result_had_data)
+
             if not hasattr(self, 'data'):
                 self.data = self.request.submit()
+
             if not self.data or not isinstance(self.data, dict):
                 pywikibot.debug(
                     '{}: stopped iteration because no dict retrieved from api.'
                     .format(type(self).__name__))
-                return
+                break
 
             if 'query' in self.data and self.resultkey in self.data['query']:
                 resultdata = self._get_resultdata()
@@ -620,10 +623,12 @@ class QueryGenerator(APIGeneratorBase, GeneratorWrapper):
                         for item in self.data['query']['normalized']}
                 else:
                     self.normalized = {}
+
                 try:
                     yield from self._extract_results(resultdata)
                 except RuntimeError:
-                    return
+                    break
+
                 # self.resultkey in data in last request.submit()
                 previous_result_had_data = True
             else:
@@ -631,23 +636,27 @@ class QueryGenerator(APIGeneratorBase, GeneratorWrapper):
                     pywikibot.log("%s: 'query' not found in api response." %
                                   self.__class__.__name__)
                     pywikibot.log(str(self.data))
+
                 # if (query-)continue is present, self.resultkey might not have
                 # been fetched yet
                 if self.continue_name not in self.data:
-                    # No results.
-                    return
+                    break  # No results.
+
                 # self.resultkey not in data in last request.submit()
                 # only "(query-)continue" was retrieved.
                 previous_result_had_data = False
+
             if self.modules[0] == 'random':
                 # "random" module does not return "(query-)continue"
                 # now we loop for a new random query
                 del self.data  # a new request is needed
                 continue
+
             if self.continue_name not in self.data:
-                return
+                break
+
             if self.continue_update():
-                return
+                break
 
             del self.data  # a new request with (query-)continue is needed
 
@@ -913,21 +922,30 @@ def _update_revisions(page, revisions) -> None:
 
 def _update_templates(page, templates) -> None:
     """Update page templates."""
-    templ_pages = [pywikibot.Page(page.site, tl['title']) for tl in templates]
+    templ_pages = {pywikibot.Page(page.site, tl['title']) for tl in templates}
     if hasattr(page, '_templates'):
-        page._templates.extend(templ_pages)
+        page._templates |= templ_pages
     else:
         page._templates = templ_pages
 
 
+def _update_categories(page, categories):
+    """Update page categories."""
+    cat_pages = {pywikibot.Page(page.site, ct['title']) for ct in categories}
+    if hasattr(page, '_categories'):
+        page._categories |= cat_pages
+    else:
+        page._categories = cat_pages
+
+
 def _update_langlinks(page, langlinks) -> None:
     """Update page langlinks."""
-    links = [pywikibot.Link.langlinkUnsafe(link['lang'], link['*'],
+    links = {pywikibot.Link.langlinkUnsafe(link['lang'], link['*'],
                                            source=page.site)
-             for link in langlinks]
+             for link in langlinks}
 
     if hasattr(page, '_langlinks'):
-        page._langlinks.extend(links)
+        page._langlinks |= links
     else:
         page._langlinks = links
 
@@ -995,12 +1013,17 @@ def update_page(page, pagedict: dict, props=None):
     if 'templates' in pagedict:
         _update_templates(page, pagedict['templates'])
     elif 'templates' in props:
-        page._templates = []
+        page._templates = set()
+
+    if 'categories' in pagedict:
+        _update_categories(page, pagedict['categories'])
+    elif 'categories' in props:
+        page._categories = set()
 
     if 'langlinks' in pagedict:
         _update_langlinks(page, pagedict['langlinks'])
     elif 'langlinks' in props:
-        page._langlinks = []
+        page._langlinks = set()
 
     if 'coordinates' in pagedict:
         _update_coordinates(page, pagedict['coordinates'])

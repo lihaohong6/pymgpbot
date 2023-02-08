@@ -27,3 +27,4 @@ docs/_build/
 .vscode/
 
 sandbox.py
+**/.DS_Store

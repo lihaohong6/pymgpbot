@@ -1,8 +1,10 @@
+*****************
 Other bot scripts
-=================
+*****************
 
-welcome script description
---------------------------
+welcome script
+==============
 
 .. automodule:: scripts.welcome
    :no-members:
+   :noindex:

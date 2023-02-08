@@ -4,6 +4,7 @@ codecov:
   strict_yaml_branch: master
 
 coverage:
+  precision: 1
   round: up
   range: 75..95
   status:
@@ -18,17 +19,13 @@ coverage:
         enabled: yes
 
   ignore:
-    - make_dist.py
-    - pywikibot/backports.py
     - pywikibot/daemonize.py
     - pywikibot/families/__init__.py
     - pywikibot/scripts/preload_sites.py
     - pywikibot/scripts/version.py
-    - pywikibot/userinterfaces/win32_unicode.py
     - scripts/dataextend.py
     - scripts/maintenance/colors.py
     - scripts/maintenance/make_i18n_dict.py
-    - scripts/maintenance/sorting_order.py
     - scripts/maintenance/wikimedia_sites.py
     - scripts/userscripts/
     - tests/pwb/
@@ -38,7 +35,3 @@ coverage:
       default:
         server: libera.chat
         channel: pywikibot
-
-    gitter:
-      default:
-        url: https://webhooks.gitter.im/e/f312b840da1c40d9f4be

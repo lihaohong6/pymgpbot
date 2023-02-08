@@ -105,7 +105,7 @@ user talk pages (namespace #3):
 
 """
 #
-# (C) Pywikibot team, 2003-2021
+# (C) Pywikibot team, 2003-2022
 #
 # Distributed under the terms of the MIT license.
 #
@@ -115,7 +115,11 @@ import pywikibot
 from pywikibot import i18n, pagegenerators, textlib
 from pywikibot.bot import SingleSiteBot
 from pywikibot.pagegenerators import XMLDumpPageGenerator
-from pywikibot.tools.itertools import filter_unique, roundrobin_generators
+from pywikibot.tools.itertools import (
+    filter_unique,
+    itergroup,
+    roundrobin_generators,
+)
 from scripts.replace import ReplaceRobot as ReplaceBot
 
 
@@ -177,12 +181,12 @@ class TemplateRobot(ReplaceBot):
                                              'pagelist', ]
             elif self.opt.remove:
                 separate_line_regex = re.compile(
-                    r'^[*#:]* *{} *\n'.format(template_regex.pattern),
+                    fr'^[*#:]* *{template_regex.pattern} *\n',
                     re.DOTALL | re.MULTILINE)
                 replacements.append((separate_line_regex, ''))
 
                 spaced_regex = re.compile(
-                    r' +{} +'.format(template_regex.pattern),
+                    fr' +{template_regex.pattern} +',
                     re.DOTALL)
                 replacements.append((spaced_regex, ' '))
 
@@ -215,7 +219,6 @@ def main(*args: str) -> None:
     :param args: command line arguments
     """
     template_names = []
-    templates = {}
     options = {}
     # If xmlfilename is None, references will be loaded from the live wiki.
     xmlfilename = None
@@ -266,15 +269,13 @@ def main(*args: str) -> None:
         return
 
     if bool(options.get('subst', False)) ^ options.get('remove', False):
-        for template_name in template_names:
-            templates[template_name] = None
+        templates = dict.fromkeys(template_names)
     else:
         try:
-            for i in range(0, len(template_names), 2):
-                templates[template_names[i]] = template_names[i + 1]
-        except IndexError:
-            pywikibot.output('Unless using solely -subst or -remove, '
-                             'you must give an even number of template names.')
+            templates = dict(itergroup(template_names, 2, strict=True))
+        except ValueError:
+            pywikibot.info('Unless using solely -subst or -remove, you must '
+                           'give an even number of template names.')
             return
 
     old_templates = [pywikibot.Page(site, template_name, ns=10)

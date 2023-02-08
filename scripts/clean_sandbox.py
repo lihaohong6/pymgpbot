@@ -18,12 +18,15 @@ Furthermore, the following command line parameters are supported:
                    The minimum delay time is 5 minutes.
 
     -text          The text that substitutes in the sandbox, you can use this
-                   when you haven't configured clean_candbox for your wiki.
+                   when you haven't configured clean_sandbox for your wiki.
 
-    -summary       Summary of the edit made by bot. Overrides the default
+    -textfile      As an alternative to -text, you can use this to provide
+                   a file containing the text to be used.
+
+    -summary       Summary of the edit made by the bot. Overrides the default
                    from i18n.
 
-This script is a :py:obj:`ConfigParserBot <pywikibot.bot.ConfigParserBot>`.
+This script is a :py:obj:`ConfigParserBot <bot.ConfigParserBot>`.
 All local parameters can be given inside a scripts.ini file. Options
 passed to the script are priorized over options read from ini file.
 
@@ -40,7 +43,7 @@ For example:
     delay: 7
 """
 #
-# (C) Pywikibot team, 2006-2022
+# (C) Pywikibot team, 2006-2023
 #
 # Distributed under the terms of the MIT license.
 #
@@ -56,26 +59,54 @@ from pywikibot.exceptions import EditConflictError, NoPageError
 
 content = {
     'commons': '{{Sandbox}}\n<!-- Please edit only below this line. -->',
-    'meta': '{{Meta:Sandbox/Please do not edit this line}}'
-            '<!--Please edit below this line.-->',
+    'meta': '{{Meta:Sandbox/Please do not edit this line}}\n'
+            '<!-- Please edit below this line. -->',
+    'species': '{{Sandbox}}\n'
+               '<!-- PLEASE ADD YOUR EDITS BELOW THIS LINE. THANK YOU. -->',
     'test': '<noinclude>{{Sandbox}}</noinclude>\n'
             '== Please start your testing below this line ==',
     'wikidata': '{{Please leave this line alone (sandbox heading)}}',
     'wikibooks': {
+        'es': '{{subst:ZDP/2}}',
         'ru': '{{/Шапка}}\n'
               '<!-- Не удаляйте, пожалуйста, эту строку, '
               'тестируйте ниже -->',
     },
-    'wikivoyage': {
+    'wikinews': {
+        'es': '{{ZDP}}\n== Haz tus pruebas bajo esta sección  ==',
+    },
+    'wikiquote': {
+        'es': '{{ZDP}}\n== Haz tus pruebas bajo esta sección  ==',
+    },
+    'wikisource': {
         'es': '<!--No borres este mensaje-->'
               '{{Zona de pruebas}}'
-              '<!--Haz las pruebas debajo. Gracias-->\n\n'
-              '== Las pruebas en esta sección ==\n',
+              '<!--Haz las pruebas debajo. Gracias-->\n',
+    },
+    'wikiversity': {
+        'es': '{{/encabezado}}\n'
+              '== Haz tus pruebas bajo esta sección  ==',
+    },
+    'wikivoyage': {
+        'es': '<!--No borres este mensaje-->{{Zona de pruebas}}'
+              '<!--Haz las pruebas debajo. Gracias-->\n'
+              '== Haz tus pruebas bajo esta sección ==',
+    },
+    'wiktionary': {
+        'es': '<!--No borres este mensaje-->{{Titular-zdp}}'
+              '<!--Haz las pruebas debajo. Gracias-->',
     },
     'als': '{{subst:/Vorlage}}',
     'ar': '{{عنوان الملعب}}\n<!-- مرحبا! خذ راحتك في تجربة مهارتك في التنسيق '
           'والتحرير أسفل هذا السطر. هذه الصفحة لتجارب التعديل ، سيتم تفريغ '
           'هذه الصفحة كل 12 ساعة. -->',
+    'ary': '{{راس تيران}}<!--'
+           '\n*               مرحبا بيك ف تّيران د رّملة!              *'
+           '\n*            عافاك خلي هاد لپارتية ف بلاصتها            *'
+           '\n*        هاد لپاج كيتّمحا لمحتوى ديالها بشكل معاود      *'
+           '\n*    تريني هنا ؤ تعلم معا راسك كيفاش تكتب ف ويكيپيديا  *'
+           '\n■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■-->'
+           '\n\n[[تصنيف:معاونة ف لكتابة علا ويكيپيديا]]',
     'arz': '{{عنوان السبوره}}\n<!-- مرحبا! خد راحتك فى تجريب مهاراتك فى'
            'التحرير تحت الخط ده. بما إن الصفحه دى لتجارب التعديل، فالصفحه دى '
            'حيتم تنضيفها اوتوماتيكيا كل 12 ساعه. -->',
@@ -83,6 +114,7 @@ content = {
           '<!-- AŞAĞIDAKI XƏTTİN ALTINDAN YAZA BİLƏRSİNİZ --->',
     'bar': '{{Bitte erst NACH dieser Zeile schreiben! (Begrüßungskasten)}}\n',
     'bn': '{{খেলাঘর}}<!-- অনুগ্রহপূর্বক এই লাইনটি অপসারণ করবেন না -->',
+    'ckb': '{{subst:تکایە دەستکاریی سەری خۆڵەپەتانێ مەکە}}',
     'cs': '{{Tento řádek neměňte}}\n<!-- ************  Prosíme, '
           'NEMĚŇTE nic nad tímto řádkem.  Díky.  ************ -->\n\n'
           "== Bábovičky ==\n#'''první'''\n#''druhá''\n*třetí\n"
@@ -93,6 +125,9 @@ content = {
           'and editing skills below this line. As this page is for editing '
           'experiments, this page will automatically be cleaned every 12 '
           'hours. -->',
+    'es': '<!--No borres este mensaje-->{{Titular-zdp}}'
+          '<!--Haz las pruebas debajo. Gracias-->\n'
+          '== Las pruebas en esta sección ==\n',
     'eo': '{{Bonvolu ne forigi tiun ĉi linion (Provejo)}}',
     'fa': '{{subst:Wikipedia:ربات/sandbox}}',
     'fi': '{{subst:Hiekka}}',
@@ -195,8 +230,8 @@ class SandboxBot(Bot, ConfigParserBot):
             wait = False
             now = time.strftime('%d %b %Y %H:%M:%S (UTC)', time.gmtime())
             for sandbox_page in self.generator:
-                pywikibot.output('Preparing to process sandbox page '
-                                 + sandbox_page.title(as_link=True))
+                pywikibot.info('Preparing to process sandbox page '
+                               + sandbox_page.title(as_link=True))
                 if sandbox_page.isRedirectPage():
                     pywikibot.warning(
                         '{} is a redirect page, cleaning it anyway'
@@ -211,55 +246,55 @@ class SandboxBot(Bot, ConfigParserBot):
                     subst = 'subst:' in self.translated_content
                     pos = text.find(self.translated_content.strip())
                     if text.strip() == self.translated_content.strip():
-                        pywikibot.output(
+                        pywikibot.info(
                             'The sandbox is still clean, no change necessary.')
                     elif subst and sandbox_page.userName() == self.site.user():
-                        pywikibot.output(
+                        pywikibot.info(
                             'The sandbox might be clean, no change necessary.')
                     elif pos != 0 and not subst:
                         sandbox_page.put(self.translated_content,
                                          translated_msg)
                         pywikibot.showDiff(text, self.translated_content)
-                        pywikibot.output('Standard content was changed, '
-                                         'sandbox cleaned.')
+                        pywikibot.info(
+                            'Standard content was changed, sandbox cleaned.')
                     else:
                         edit_delta = (datetime.datetime.utcnow()
-                                      - sandbox_page.editTime())
+                                      - sandbox_page.latest_revision.timestamp)
                         delta = self.delay_td - edit_delta
                         # Is the last edit more than 'delay' minutes ago?
                         if delta <= datetime.timedelta(0):
                             sandbox_page.put(
                                 self.translated_content, translated_msg)
                             pywikibot.showDiff(text, self.translated_content)
-                            pywikibot.output('Standard content was changed, '
-                                             'sandbox cleaned.')
+                            pywikibot.info('Standard content was changed, '
+                                           'sandbox cleaned.')
                         else:  # wait for the rest
-                            pywikibot.output(
+                            pywikibot.info(
                                 'Sandbox edited {:.1f} minutes ago...'
                                 .format(edit_delta.seconds / 60.0))
-                            pywikibot.output('Sleeping for {} minutes.'
-                                             .format(delta.seconds // 60))
+                            pywikibot.info(
+                                f'Sleeping for {delta.seconds // 60} minutes.')
                             pywikibot.sleep(delta.seconds)
                             wait = True
                 except EditConflictError:
-                    pywikibot.output(
+                    pywikibot.info(
                         '*** Loading again because of edit conflict.\n')
                 except NoPageError:
-                    pywikibot.output(
+                    pywikibot.info(
                         '*** The sandbox is not existent, skipping.')
                     continue
 
             if self.opt.hours < 0:
-                pywikibot.output('\nDone.')
+                pywikibot.info('\nDone.')
                 return
 
             if not wait:
                 if self.opt.hours < 1.0:
-                    pywikibot.output('\nSleeping {} minutes, now {}'.format(
-                        (self.opt.hours * 60), now))
+                    pywikibot.info(
+                        f'\nSleeping {self.opt.hours * 60} minutes, now {now}')
                 else:
-                    pywikibot.output('\nSleeping {} hours, now {}'
-                                     .format(self.opt.hours, now))
+                    pywikibot.info(
+                        f'\nSleeping {self.opt.hours} hours, now {now}')
                 pywikibot.sleep(self.opt.hours * 60 * 60)
 
 
@@ -272,6 +307,7 @@ def main(*args: str) -> None:
     :param args: command line arguments
     """
     opts = {}
+    textfile_opt = None
     local_args = pywikibot.handle_args(args)
     gen_factory = pagegenerators.GeneratorFactory()
     for arg in local_args:
@@ -287,10 +323,26 @@ def main(*args: str) -> None:
         elif opt == 'text':
             opts[opt] = value or pywikibot.input(
                 'What text do you want to substitute?')
+        elif opt == 'textfile':
+            textfile_opt = value or pywikibot.input(
+                'What file contains the text you want to substitute with?')
         elif opt == 'summary':
             opts[opt] = value or pywikibot.input('Enter the summary:')
         else:
             gen_factory.handle_arg(arg)
+
+    if textfile_opt:
+        if 'text' in opts:
+            pywikibot.error(
+                'Arguments -text and -textfile '
+                "can't be provided at the same time")
+            return
+        try:
+            with open(textfile_opt, encoding='utf-8') as textfile:
+                opts['text'] = textfile.read()
+        except OSError as e:
+            pywikibot.error(f'Error loading {opts["textfile"]}: {e}')
+            return
 
     generator = gen_factory.getCombinedGenerator()
 

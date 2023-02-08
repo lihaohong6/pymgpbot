@@ -52,6 +52,8 @@ but 'p' must be included.
 #
 import pywikibot
 from pywikibot import WikidataBot, pagegenerators
+from pywikibot.backports import removeprefix
+from pywikibot.tools.itertools import itergroup
 
 
 # This is required for the text that is shown when you run this script
@@ -78,8 +80,7 @@ class ClaimRobot(WikidataBot):
         self.exists_arg = ''.join(x for x in exists_arg.lower() if x in 'pqst')
         self.cacheSources()
         if self.exists_arg:
-            pywikibot.output("'exists' argument set to '{}'"
-                             .format(self.exists_arg))
+            pywikibot.info(f"'exists' argument set to '{self.exists_arg}'")
 
     def treat_page_and_item(self, page, item) -> None:
         """Treat each page.
@@ -114,7 +115,7 @@ def main(*args: str) -> None:
     for arg in local_args:
         # Handle args specifying how to handle duplicate claims
         if arg.startswith('-exists:'):
-            exists_arg = arg.split(':')[1]
+            exists_arg = removeprefix(arg, '-exists:')
             continue
         # Handle page generator args
         if gen.handle_arg(arg):
@@ -126,15 +127,15 @@ def main(*args: str) -> None:
 
     claims = []
     repo = pywikibot.Site().data_repository()
-    for i in range(0, len(commandline_claims), 2):
-        claim = pywikibot.Claim(repo, commandline_claims[i])
+    for property_id, target_str in itergroup(commandline_claims, 2):
+        claim = pywikibot.Claim(repo, property_id)
         if claim.type == 'wikibase-item':
-            target = pywikibot.ItemPage(repo, commandline_claims[i + 1])
+            target = pywikibot.ItemPage(repo, target_str)
         elif claim.type == 'string':
-            target = commandline_claims[i + 1]
+            target = target_str
         elif claim.type == 'globe-coordinate':
             coord_args = [
-                float(c) for c in commandline_claims[i + 1].split(',')]
+                float(c) for c in target_str.split(',')]
             if len(coord_args) >= 3:
                 precision = coord_args[2]
             else:

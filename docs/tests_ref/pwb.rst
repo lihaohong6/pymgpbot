@@ -1,13 +1,14 @@
+*****************
 tests.pwb package
-=================
+*****************
 
 .. automodule:: tests.pwb
     :members:
     :undoc-members:
     :show-inheritance:
 
-Submodules
-----------
+pwb submodules
+==============
 
 .. toctree::
 

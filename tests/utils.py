@@ -11,24 +11,17 @@ import unittest
 import warnings
 from contextlib import contextmanager
 from subprocess import PIPE, Popen, TimeoutExpired
+from typing import Optional
 
 import pywikibot
 from pywikibot import config
+from pywikibot.backports import List
 from pywikibot.data.api import CachedRequest
 from pywikibot.data.api import Request as _original_Request
 from pywikibot.exceptions import APIError
 from pywikibot.login import LoginStatus
 from pywikibot.site import Namespace
-from pywikibot.tools import PYTHON_VERSION
-
 from tests import _pwb_py
-
-
-try:
-    from cryptography import __version__ as cryptography_version
-    cryptography_version = list(map(int, cryptography_version.split('.')))
-except ImportError:
-    cryptography_version = None
 
 
 OSWIN32 = (sys.platform == 'win32')
@@ -47,7 +40,23 @@ def expected_failure_if(expect):
 
 
 def fixed_generator(iterable):
-    """Return a dummy generator ignoring all parameters."""
+    """Return a dummy generator ignoring all parameters.
+
+    This can be used to overwrite a generator method and yield
+    predefined items:
+
+    >>> from tests.utils import fixed_generator
+    >>> site = pywikibot.Site()
+    >>> page = pywikibot.Page(site, 'Any page')
+    >>> list(page.linkedPages(total=1))
+    []
+    >>> gen = fixed_generator([
+    ...     pywikibot.Page(site, 'User:BobBot/Redir'),
+    ...     pywikibot.Page(site, 'Main Page')])
+    >>> page.linkedPages = gen
+    >>> list(page.linkedPages(total=1))
+    [Page('Benutzer:BobBot/Redir'), Page('Main Page')]
+    """
     def gen(*args, **kwargs):
         yield from iterable
 
@@ -209,7 +218,7 @@ class AssertAPIErrorContextManager:
 
 class DryParamInfo(dict):
 
-    """Dummy class to use instead of :py:obj:`pywikibot.data.api.ParamInfo`."""
+    """Dummy class to use instead of :py:obj:`data.api.ParamInfo`."""
 
     def __init__(self, *args, **kwargs):
         """Initializer."""
@@ -284,7 +293,7 @@ class DummySiteinfo:
 
 class DryRequest(CachedRequest):
 
-    """Dummy class to use instead of :py:obj:`pywikibot.data.api.Request`."""
+    """Dummy class to use instead of :py:obj:`data.api.Request`."""
 
     def __init__(self, *args, **kwargs):
         """Initializer."""
@@ -419,7 +428,7 @@ class DryPage(pywikibot.Page):
         return self._disambig
 
 
-class FakeLoginManager(pywikibot.data.api.LoginManager):
+class FakeLoginManager(pywikibot.login.ClientLoginManager):
 
     """Loads a fake password."""
 
@@ -433,18 +442,12 @@ class FakeLoginManager(pywikibot.data.api.LoginManager):
         """Ignore password changes."""
 
 
-def execute(command, data_in=None, timeout=None, error=None):
+def execute(command: List[str], data_in=None, timeout=None, error=None):
     """
     Execute a command and capture outputs.
 
     :param command: executable to run and arguments to use
-    :type command: list of str
     """
-    if PYTHON_VERSION < (3, 6):
-        command.insert(1, '-W ignore::FutureWarning:pywikibot:103')
-    if cryptography_version and cryptography_version < [1, 3, 4]:
-        command.insert(1, '-W ignore:Old version of cryptography:Warning')
-
     env = os.environ.copy()
 
     # Prevent output by test package; e.g. 'max_retries reduced from x to y'
@@ -497,7 +500,7 @@ def execute_pwb(args, data_in=None, timeout=None, error=None, overrides=None):
     if overrides:
         command.append('-c')
         overrides = '; '.join(
-            '{} = {}'.format(key, value) for key, value in overrides.items())
+            f'{key} = {value}' for key, value in overrides.items())
         command.append(
             'import pwb; import pywikibot; {}; pwb.main()'
             .format(overrides))
@@ -517,8 +520,38 @@ def empty_sites():
 
 
 @contextmanager
-def skipping(*exceptions, msg=None):
-    """Context manager to skip test on specified exceptions."""
+def skipping(*exceptions: BaseException, msg: Optional[str] = None):
+    """Context manager to skip test on specified exceptions.
+
+    For example Eventstreams raises ``NotImplementedError`` if no
+    ``streams`` parameter was given. Skip the following tests in that
+    case::
+
+        with skipping(NotImplementedError):
+            self.es = comms.eventstreams.EventStreams(streams=None)
+        self.assertIsInstance(self.es, tools.collections.GeneratorWrapper)
+
+    The exception message is used for the ``SkipTest`` reason. To use a
+    custom message, add a ``msg`` parameter::
+
+        with skipping(AssertionError, msg='T304786'):
+            self.assertEqual(self.get_mainpage().oldest_revision.text, text)
+
+    Multiple context expressions may also be used::
+
+        with (
+            skipping(OtherPageSaveError),
+            self.assertRaisesRegex(SpamblacklistError, 'badsite.com'),
+        ):
+            page.save()
+
+    .. note:: The last sample uses Python 3.10 syntax.
+
+    .. versionadded:: 6.2
+
+    :param msg: Optional skipping reason
+    :param exceptions: Exceptions to let test skip
+    """
     try:
         yield
     except exceptions as e:

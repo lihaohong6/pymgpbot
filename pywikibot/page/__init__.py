@@ -1,27 +1,29 @@
 """Interface of various types of MediaWiki pages."""
 #
-# (C) Pywikibot team, 2022
+# (C) Pywikibot team, 2022-2023
 #
 # Distributed under the terms of the MIT license.
 #
 from typing import Union
 
+from pywikibot.page._basepage import BasePage
+from pywikibot.page._category import Category
 from pywikibot.page._filepage import FileInfo, FilePage
 from pywikibot.page._links import BaseLink, Link, SiteLink, html2unicode
-from pywikibot.page._pages import BasePage, Category, Page
+from pywikibot.page._page import Page
 from pywikibot.page._revision import Revision
 from pywikibot.page._user import User
 from pywikibot.page._wikibase import (
     Claim,
     ItemPage,
+    LexemeForm,
+    LexemePage,
+    LexemeSense,
     MediaInfo,
     Property,
     PropertyPage,
     WikibaseEntity,
     WikibasePage,
-    LexemePage,
-    LexemeForm,
-    LexemeSense,
 )
 from pywikibot.site import BaseSite as _BaseSite
 from pywikibot.tools import deprecated, issue_deprecation_warning
@@ -67,7 +69,7 @@ def url2unicode(title: str, encodings='utf-8') -> str:
     Uses the first encoding that doesn't cause an error.
 
     .. deprecated:: 6.2
-       Use :func:`pywikibot.tools.chars.url2string` instead.
+       Use :func:`tools.chars.url2string` instead.
 
     :param title: URL-encoded character data to convert
     :param encodings: Encodings to attempt to use during conversion.

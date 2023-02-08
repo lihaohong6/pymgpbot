@@ -1,4 +1,6 @@
-specialbots package
-===================
+********************************************
+:mod:`specialbots` --- Special Reusable Bots
+********************************************
 
-.. automodule:: pywikibot.specialbots
+.. automodule:: specialbots
+   :synopsis: Module containing special bots reusable by scripts

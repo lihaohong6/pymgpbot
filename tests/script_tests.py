@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Test that each script can be compiled and executed."""
 #
-# (C) Pywikibot team, 2014-2022
+# (C) Pywikibot team, 2014-2023
 #
 # Distributed under the terms of the MIT license.
 #
@@ -17,7 +17,7 @@ from tests.aspects import DefaultSiteTestCase, MetaTestCaseClass, PwbTestCase
 from tests.utils import execute_pwb
 
 
-ci_test_run = os.environ.get('PYWIKIBOT_TESTS_RUNNING', '0') == '1'
+ci_test_run = os.environ.get('PYWIKIBOT_TEST_RUNNING', '0') == '1'
 scripts_path = join_root_path('scripts')
 
 # login scritpt should be the first to test
@@ -26,8 +26,7 @@ framework_scripts = ['login', 'shell']
 # These dependencies are not always the package name which is in setup.py.
 # Here, the name given to the module which will be imported is required.
 script_deps = {
-    'commons_information': ['mwparserfromhell'],
-    'patrol': ['mwparserfromhell'],
+    'create_isbn_edition': ['isbnlib', 'unidecode'],
     'weblinkchecker': ['memento_client'],
 }
 
@@ -63,6 +62,7 @@ def list_scripts(path, exclude=None):
 script_list = framework_scripts + list_scripts(scripts_path)
 
 script_input = {
+    'create_isbn_edition': '\n',
     'interwiki': 'Test page that should not exist\n',
     'misspelling': 'q\n',
     'pagefromfile': 'q\n',
@@ -70,16 +70,20 @@ script_input = {
                                   # Enter to begin, Enter for default summary.
     'shell': '\n',  # exits on end of stdin
     'solve_disambiguation': 'Test page\nq\n',
+    'unusedfiles': 'q\n',
     'upload':
         'https://upload.wikimedia.org/wikipedia/commons/'
         '8/80/Wikipedia-logo-v2.svg\n\n\n',
 }
 
-auto_run_script_list = [
+#:
+auto_run_script_set = {
+    'archivebot',
     'blockpageschecker',
     'category_redirect',
     'checkimages',
     'clean_sandbox',
+    'create_isbn_edition',
     'delinker',
     'login',
     'misspelling',
@@ -93,12 +97,13 @@ auto_run_script_list = [
     'upload',
     'watchlist',
     'welcome',
-]
+}
 
 # Expected result for no arguments
 # Some of these are not pretty, but at least they are informative
 # and not backtraces starting deep in the pywikibot package.
 no_args_expected_results = {
+    'archivebot': 'No template was specified, using default',
     # TODO: until done here, remember to set editor = None in user-config.py
     'change_pagelang': 'No -setlang parameter given',
     'checkimages': 'Execution time: 0 seconds',
@@ -132,62 +137,31 @@ skip_on_results = {
 }
 
 
-enable_autorun_tests = (
-    os.environ.get('PYWIKIBOT_TEST_AUTORUN', '0') == '1')
-
-
 def collector(loader=unittest.loader.defaultTestLoader):
-    """Load the default tests."""
-    # Note: Raising SkipTest during load_tests will
-    # cause the loader to fallback to its own
-    # discover() ordering of unit tests.
+    """Load the default tests.
 
-    if unrunnable_script_set:
+    .. note:: Raising SkipTest during load_tests will cause the loader
+       to fallback to its own discover() ordering of unit tests.
+    """
+    if unrunnable_script_set:  # pragma: no cover
         unittest_print('Skipping execution of unrunnable scripts:\n  {!r}'
                        .format(unrunnable_script_set))
 
-    if not enable_autorun_tests:
-        unittest_print('Skipping execution of auto-run scripts '
-                       '(set PYWIKIBOT_TEST_AUTORUN=1 to enable):\n  {!r}'
-                       .format(auto_run_script_list))
+    test_pattern = 'tests.script_tests.TestScript{}.test_{}'
 
-    tests = (['test__login']
-             + ['test_' + name
-                 for name in sorted(script_list)
-                 if name != 'login'
-                 and name not in unrunnable_script_set
-                ])
+    tests = ['_login'] + [name for name in sorted(script_list)
+                          if name != 'login'
+                          and name not in unrunnable_script_set]
+    test_list = [test_pattern.format('Help', name) for name in tests]
 
-    test_list = ['tests.script_tests.TestScriptHelp.' + name
-                 for name in tests]
+    tests = [name for name in tests if name not in failed_dep_script_set]
+    test_list += [test_pattern.format('Simulate', name) for name in tests]
 
-    tests = (['test__login']
-             + ['test_' + name
-                 for name in sorted(script_list)
-                 if name != 'login'
-                 and name not in failed_dep_script_set
-                 and name not in unrunnable_script_set
-                 and (enable_autorun_tests or name not in auto_run_script_list)
-                ])
+    tests = [name for name in tests if name not in auto_run_script_set]
+    test_list += [test_pattern.format('Generator', name) for name in tests]
 
-    test_list += ['tests.script_tests.TestScriptSimulate.' + name
-                  for name in tests]
-
-    tests = (['test__login']
-             + ['test_' + name
-                 for name in sorted(script_list)
-                 if name != 'login'
-                 and name not in failed_dep_script_set
-                 and name not in unrunnable_script_set
-                 and (enable_autorun_tests or name not in auto_run_script_list)
-                ])
-
-    test_list += ['tests.script_tests.TestScriptGenerator.' + name
-                  for name in tests]
-
-    tests = loader.loadTestsFromNames(test_list)
     suite = unittest.TestSuite()
-    suite.addTests(tests)
+    suite.addTests(loader.loadTestsFromNames(test_list))
     return suite
 
 
@@ -200,15 +174,15 @@ def load_tests(loader=unittest.loader.defaultTestLoader,
 def import_script(script_name: str):
     """Import script for coverage only (T305795)."""
     if not ci_test_run:
-        return
+        return  # pragma: no cover
+
+    prefix = 'scripts.'
     if script_name in framework_scripts:
-        prefix = 'pywikibot.scripts.'
-    else:
-        prefix = 'scripts.'
+        prefix = 'pywikibot.' + prefix
     import_module(prefix + script_name)
 
 
-class TestScriptMeta(MetaTestCaseClass):
+class ScriptTestMeta(MetaTestCaseClass):
 
     """Test meta class."""
 
@@ -219,13 +193,7 @@ class TestScriptMeta(MetaTestCaseClass):
                 args = []
 
             is_autorun = ('-help' not in args
-                          and script_name in auto_run_script_list)
-
-            def test_skip_script(self):
-                raise unittest.SkipTest(
-                    'Skipping execution of auto-run scripts (set '
-                    'PYWIKIBOT_TEST_AUTORUN=1 to enable) "{}"'
-                    .format(script_name))
+                          and script_name in auto_run_script_set)
 
             def test_script(self):
                 global_args_msg = \
@@ -315,8 +283,6 @@ class TestScriptMeta(MetaTestCaseClass):
                 self.assertIn(result['exit_code'], exit_codes)
                 sys.stdout.flush()
 
-            if not enable_autorun_tests and is_autorun:
-                return test_skip_script
             return test_script
 
         arguments = dct['_arguments']
@@ -343,7 +309,7 @@ class TestScriptMeta(MetaTestCaseClass):
                 dct[test_name] = unittest.expectedFailure(dct[test_name])
             elif script_name in dct['_allowed_failures']:
                 dct[test_name] = unittest.skip(
-                    '{} is in _allowed_failures list'
+                    '{} is in _allowed_failures set'
                     .format(script_name))(dct[test_name])
             elif script_name in failed_dep_script_set \
                     and arguments == '-simulate':
@@ -360,7 +326,7 @@ class TestScriptMeta(MetaTestCaseClass):
         return super().__new__(cls, name, bases, dct)
 
 
-class TestScriptHelp(PwbTestCase, metaclass=TestScriptMeta):
+class TestScriptHelp(PwbTestCase, metaclass=ScriptTestMeta):
 
     """Test cases for running scripts with -help.
 
@@ -372,7 +338,7 @@ class TestScriptHelp(PwbTestCase, metaclass=TestScriptMeta):
     # Here come scripts requiring and missing dependencies, that haven't been
     # fixed to output -help in that case.
     _expected_failures = {'version'}
-    _allowed_failures = []
+    _allowed_failures = set()
 
     _arguments = '-help'
     _results = None
@@ -381,7 +347,7 @@ class TestScriptHelp(PwbTestCase, metaclass=TestScriptMeta):
 
 
 class TestScriptSimulate(DefaultSiteTestCase, PwbTestCase,
-                         metaclass=TestScriptMeta):
+                         metaclass=ScriptTestMeta):
 
     """Test cases for running scripts with -siumlate.
 
@@ -395,23 +361,33 @@ class TestScriptSimulate(DefaultSiteTestCase, PwbTestCase,
 
     _expected_failures = {
         'catall',          # stdout user interaction
-        'upload',          # raises custom ValueError
+        'checkimages',
+        'revertbot',
     }
 
-    _allowed_failures = [
+    _allowed_failures = {
+        'blockpageschecker',  # not localized for some test sites
+        'clean_sandbox',
+        'delinker',
         'disambredir',
-        'misspelling',   # T94681
-        'watchlist',     # T77965
-    ]
+        'misspelling',  # T94681
+        'noreferences',
+        'nowcommons',
+        'patrol',
+        'shell',
+        'unusedfiles',  # not localized for default sites
+        'upload',  # raises custom ValueError
+        'watchlist',  # not logged in
+    }
 
     _arguments = '-simulate'
     _results = no_args_expected_results
     _skip_results = skip_on_results
-    _timeout = auto_run_script_list
+    _timeout = auto_run_script_set
 
 
 class TestScriptGenerator(DefaultSiteTestCase, PwbTestCase,
-                          metaclass=TestScriptMeta):
+                          metaclass=ScriptTestMeta):
 
     """Test cases for running scripts with a generator."""
 
@@ -420,49 +396,55 @@ class TestScriptGenerator(DefaultSiteTestCase, PwbTestCase,
     _expected_failures = {
         'add_text',
         'archivebot',
+        'blockpageschecker',
         'category',
+        'category_graph',
+        'category_redirect',
         'change_pagelang',
+        'checkimages',
         'claimit',
+        'clean_sandbox',
+        'commonscat',
+        'create_isbn_edition',
         'dataextend',
         'data_ingestion',
         'delete',
+        'delinker',
         'djvutext',
         'download_dump',
         'harvest_template',
+        'imagetransfer',
         'interwiki',
         'listpages',
+        'login',
+        'misspelling',
         'movepages',
         'pagefromfile',
+        'parser_function_count',
+        'patrol',
         'protect',
         'redirect',
-        'reflinks',
+        'reflinks',  # 404-links.txt is required
         'replicate_wiki',
+        'revertbot',
+        'shell',
+        'solve_disambiguation',
         'speedy_delete',
         'template',
         'templatecount',
         'transferbot',
+        'unusedfiles',
+        'upload',
+        'watchlist',
+        'weblinkchecker',
+        'welcome',
     }
 
-    _allowed_failures = [
+    _allowed_failures = {
         'basic',
-        'commonscat',
-        'commons_information',
-        'coordinate_import',
-        'cosmetic_changes',
-        'fixing_redirects',
-        'illustrate_wikidata',
-        'image',
-        'imagetransfer',
-        'interwikidata',
-        'newitem',
-        'replace',
-        'solve_disambiguation',
-        'touch',
-        'weblinkchecker',
-    ]
-
-    _arguments = '-simulate -page:Foo -always'
-    _results = ("Working on 'Foo", 'Script terminated successfully')
+    }
+    _arguments = '-simulate -page:Foobar -always -site:wikipedia:en'
+    _results = ("Working on 'Foobar'", 'Script terminated successfully')
     _skip_results = {}
     _timeout = True
 

@@ -7,7 +7,7 @@ If you wish to run this as an stand-alone script, use::
 
     scripts/cosmetic_changes.py
 
-For regular use, it is recommended to put this line into your user-config.py::
+For regular use, it is recommended to put this line into your user config::
 
     cosmetic_changes = True
 
@@ -15,7 +15,7 @@ You may enable cosmetic changes for additional languages by adding the
 dictionary cosmetic_changes_enable to your user-config.py. It should contain
 a tuple of languages for each site where you wish to enable in addition to
 your own langlanguage if cosmetic_changes_mylang_only is True (see below).
-Please set your dictionary by adding such lines to your user-config.py::
+Please set your dictionary by adding such lines to your user config::
 
     cosmetic_changes_enable['wikipedia'] = ('de', 'en', 'fr')
 
@@ -26,13 +26,14 @@ There is another config variable: You can set::
 if you're running a bot on multiple sites and want to do cosmetic changes on
 all of them, but be careful if you do.
 
-You may disable cosmetic changes by adding the all unwanted languages to the
-dictionary cosmetic_changes_disable in your user-config.py. It should contain
-a tuple of languages for each site where you wish to disable cosmetic changes.
-You may use it with cosmetic_changes_mylang_only is False, but you can also
-disable your own language. This also overrides the settings in the dictionary
-cosmetic_changes_enable. Please set this dictionary by adding such lines to
-your user-config.py::
+You may disable cosmetic changes by adding the all unwanted languages to
+the `dictionary cosmetic_changes_disable` in your user config file
+(`user_config.py`). It should contain a tuple of languages for each site
+where you wish to disable cosmetic changes. You may use it with
+`cosmetic_changes_mylang_only` is False, but you can also disable your
+own language. This also overrides the settings in the dictionary
+`cosmetic_changes_enable`. Please set this dictionary by adding such
+lines to your user config file::
 
     cosmetic_changes_disable['wikipedia'] = ('de', 'en', 'fr')
 
@@ -193,13 +194,13 @@ def _format_isbn_match(match: Match[str], strict: bool = True) -> str:
         raise NotImplementedError(
             'ISBN functionality not available. Install stdnum package.')
 
-    isbn = match.group('code')
+    isbn = match['code']
     try:
         stdnum_isbn.validate(isbn)
     except stdnum_isbn.ValidationError as e:
         if strict:
             raise
-        pywikibot.log('ISBN "{}" validation error: {}'.format(isbn, e))
+        pywikibot.log(f'ISBN "{isbn}" validation error: {e}')
         return isbn
 
     return stdnum_isbn.format(isbn)
@@ -427,7 +428,7 @@ class CosmeticChangesToolkit:
             # lowerspaced and underscored namespaces
             for i, item in enumerate(namespaces):
                 item = item.replace(' ', '[ _]')
-                item = '[{}{}]'.format(item[0], item[0].lower()) + item[1:]
+                item = f'[{item[0]}{item[0].lower()}]' + item[1:]
                 namespaces[i] = item
             namespaces.append(first_lower(final_ns))
             if final_ns and namespaces:
@@ -440,14 +441,14 @@ class CosmeticChangesToolkit:
                         r'\[\[\s*({}) *:(?P<name>[^\|\]]*?\.({}))'
                         r'(?P<label>.*?)\]\]'
                         .format('|'.join(namespaces), '|'.join(extensions)),
-                        r'[[{}:\g<name>\g<label>]]'.format(final_ns),
+                        fr'[[{final_ns}:\g<name>\g<label>]]',
                         exceptions)
                 else:
                     text = textlib.replaceExcept(
                         text,
                         r'\[\[\s*({}) *:(?P<nameAndLabel>.*?)\]\]'
                         .format('|'.join(namespaces)),
-                        r'[[{}:\g<nameAndLabel>]]'.format(final_ns),
+                        fr'[[{final_ns}:\g<nameAndLabel>]]',
                         exceptions)
         return text
 
@@ -488,7 +489,7 @@ class CosmeticChangesToolkit:
             return '{}|{}]]'.format(
                 split[0], '|'.join(cache.get(x.strip(), x) for x in split[1:]))
 
-        cache = {}  # type: Dict[Union[bool, str], Any]
+        cache: Dict[Union[bool, str], Any] = {}
         exceptions = ['comment', 'nowiki', 'pre', 'syntaxhighlight']
         regex = re.compile(
             FILE_LINK_REGEX % '|'.join(self.site.namespaces[6]),
@@ -518,10 +519,10 @@ class CosmeticChangesToolkit:
         # helper function which works on one link and either returns it
         # unmodified, or returns a replacement.
         def handleOneLink(match: Match[str]) -> str:
-            titleWithSection = match.group('titleWithSection')
-            label = match.group('label')
-            trailingChars = match.group('linktrail')
-            newline = match.group('newline')
+            titleWithSection = match['titleWithSection']
+            label = match['label']
+            trailingChars = match['linktrail']
+            newline = match['newline']
 
             is_interwiki = self.site.isInterwikiLink(titleWithSection)
             if is_interwiki:
@@ -597,7 +598,7 @@ class CosmeticChangesToolkit:
                 firstcase_label = label
 
             if firstcase_label == firstcase_title:
-                newLink = '[[{}]]'.format(label)
+                newLink = f'[[{label}]]'
             # Check if we can create a link with trailing characters
             # instead of a pipelink
             elif (firstcase_label.startswith(firstcase_title)
@@ -613,7 +614,7 @@ class CosmeticChangesToolkit:
                 # uppercase
                 if self.site.sitename == 'wikipedia:de':
                     titleWithSection = first_upper(titleWithSection)
-                newLink = '[[{}|{}]]'.format(titleWithSection, label)
+                newLink = f'[[{titleWithSection}|{label}]]'
             # re-add spaces that were pulled out of the link.
             # Examples:
             #   text[[ title ]]text        -> text [[title]] text
@@ -623,7 +624,7 @@ class CosmeticChangesToolkit:
             if hadLeadingSpaces and not newline:
                 newLink = ' ' + newLink
             if hadTrailingSpaces:
-                newLink = newLink + ' '
+                newLink += ' '
             if newline:
                 newLink = newline + newLink
             return newLink
@@ -818,11 +819,13 @@ class CosmeticChangesToolkit:
             if re.match(r'(?:{}):'
                         .format('|'.join((*self.site.namespaces[6],
                                           *self.site.namespaces[14]))),
-                        match.group('link')):
+                        match['link']):
                 replacement += ':'
-            replacement += match.group('link')
-            if match.group('title'):
-                replacement += '|' + match.group('title')
+
+            replacement += match['link']
+            if match['title']:
+                replacement += '|' + match['title']
+
             return replacement + ']]'
 
         exceptions = ['comment', 'math', 'nowiki', 'pre', 'startspace',
@@ -861,7 +864,7 @@ class CosmeticChangesToolkit:
                 title_regex = (r'(?P<link>[^{sep}]+?)'
                                r'(\s+(?P<title>[^\s].*?))'
                                .format(sep=separator))
-                url_regex = r'\[\[?{url}?\s*\]\]?'.format(url=url)
+                url_regex = fr'\[\[?{url}?\s*\]\]?'
                 text = textlib.replaceExcept(
                     text,
                     url_regex.format(title=title_regex),
@@ -884,7 +887,7 @@ class CosmeticChangesToolkit:
         # dash in external link, where the correct end of the URL can
         # be detected from the file extension. It is very unlikely that
         # this will cause mistakes.
-        extensions = [r'\.{}'.format(ext)
+        extensions = [fr'\.{ext}'
                       for ext in ['pdf', 'html?', 'php', 'aspx?', 'jsp']]
         text = textlib.replaceExcept(
             text,
@@ -897,8 +900,8 @@ class CosmeticChangesToolkit:
         """Relace html markups with wikitext markups."""
         def replace_header(match: Match[str]) -> str:
             """Create a header string for replacing."""
-            depth = int(match.group(1))
-            return r'{0} {1} {0}'.format('=' * depth, match.group(2))
+            depth = int(match[1])
+            return r'{0} {1} {0}'.format('=' * depth, match[2])
 
         # Everything case-insensitive (?i)
         # Keep in mind that MediaWiki automatically converts <br> to <br />
@@ -955,7 +958,7 @@ class CosmeticChangesToolkit:
 
     def fixTypo(self, text: str) -> str:
         """Fix units."""
-        exceptions = [
+        exceptions: List[Union[str, Pattern[str]]] = [
             'comment',
             'gallery',
             'hyperlink',
@@ -966,7 +969,7 @@ class CosmeticChangesToolkit:
             'pre',
             'startspace',
             'syntaxhighlight',
-        ]  # type: List[Union[str, Pattern[str]]]
+        ]
 
         # change <number> ccm -> <number> cm³
         text = textlib.replaceExcept(text, r'(\d)\s*(?:&nbsp;)?ccm',
@@ -989,7 +992,7 @@ class CosmeticChangesToolkit:
         if self.site.code not in ['ckb', 'fa']:
             return text
 
-        exceptions = [
+        exceptions: List[Union[str, Pattern[str]]] = [
             'file',
             'gallery',
             'hyperlink',
@@ -1004,7 +1007,7 @@ class CosmeticChangesToolkit:
             'ref',
             'startspace',
             'syntaxhighlight',
-        ]  # type: List[Union[str, Pattern[str]]]
+        ]
 
         digits = textlib.NON_LATIN_DIGITS
         faChrs = 'ءاآأإئؤبپتثجچحخدذرزژسشصضطظعغفقکگلمنوهیةيك' + digits['fa']

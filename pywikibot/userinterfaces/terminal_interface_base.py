@@ -22,7 +22,8 @@ from pywikibot.bot_choice import (
     StandardOption,
 )
 from pywikibot.logging import INFO, INPUT, STDOUT, VERBOSE, WARNING
-from pywikibot.tools import issue_deprecation_warning, RLock
+from pywikibot.tools import issue_deprecation_warning
+from pywikibot.tools.threading import RLock
 from pywikibot.userinterfaces import transliteration
 from pywikibot.userinterfaces._interface_base import ABUIC
 
@@ -51,8 +52,8 @@ colors = [
 ]
 
 _color_pat = '((:?{0});?(:?{0})?)'.format('|'.join(colors + ['previous']))
-old_colorTagR = re.compile('\03{{{cpat}}}'.format(cpat=_color_pat))
-new_colorTagR = re.compile('<<{cpat}>>'.format(cpat=_color_pat))
+old_colorTagR = re.compile(f'\03{{{_color_pat}}}')
+new_colorTagR = re.compile(f'<<{_color_pat}>>')
 
 
 class UI(ABUIC):
@@ -61,7 +62,7 @@ class UI(ABUIC):
 
     .. versionchanged:: 6.2:
        subclassed from
-       :py:obj:`pywikibot.userinterfaces._interface_base.ABUIC`
+       :py:obj:`userinterfaces._interface_base.ABUIC`
     """
 
     split_col_pat = re.compile(r'(\w+);?(\w+)?')
@@ -359,7 +360,7 @@ class UI(ABUIC):
             an answer.
         :param force: Automatically use the default
         """
-        assert(not password or not default)
+        assert not password or not default
 
         question = question.strip()
         end_marker = question[-1]
@@ -369,7 +370,7 @@ class UI(ABUIC):
             end_marker = ':'
 
         if default:
-            question += ' (default: {})'.format(default)
+            question += f' (default: {default})'
         question += end_marker
 
         # lock stream output
@@ -540,7 +541,9 @@ class UI(ABUIC):
 
                 self.stream_output('Error: Invalid response\n')
 
-    def editText(self, text: str, jumpIndex: Optional[int] = None,
+    @staticmethod
+    def editText(text: str,
+                 jumpIndex: Optional[int] = None,
                  highlight: Optional[str] = None) -> Optional[str]:
         """Return the text as edited by the user.
 
@@ -555,7 +558,7 @@ class UI(ABUIC):
         try:
             from pywikibot.userinterfaces import gui
         except ImportError as e:
-            pywikibot.warning('Could not load GUI modules: {}'.format(e))
+            pywikibot.warning(f'Could not load GUI modules: {e}')
             return text
         editor = gui.EditBoxWindow()
         return editor.edit(text, jumpIndex=jumpIndex, highlight=highlight)

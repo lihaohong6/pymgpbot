@@ -25,11 +25,10 @@ join_pwb_tests_path = create_path_func(join_tests_path, 'pwb')
 
 class TestPwb(PwbTestCase):
 
-    """
-    Test pwb.py functionality.
+    """Test pwb.py functionality.
 
-    This is registered as a Site test because it will not run
-    without a user-config.py
+    This is registered as a Site test because it will not run without a
+    user config file.
     """
 
     # site must be explicitly set for pwb tests. This test does not require
@@ -120,7 +119,7 @@ class TestPwb(PwbTestCase):
             text = stderr.readline().strip()
             self.assertTrue(
                 text.startswith(result[1]),
-                msg='"{}" does not start with "{}"'.format(text, result[1]))
+                msg=f'"{text}" does not start with "{result[1]}"')
         with self.subTest(line=2):
             self.assertEqual(stderr.readline().strip(), result[2])
 

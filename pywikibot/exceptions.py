@@ -68,7 +68,7 @@ the framework::
 
 Error: Base class, all exceptions should the subclass of this class.
 
-  - NoUsernameError: Username is not in user-config.py, or it is invalid.
+  - NoUsernameError: Username is not in user config file, or it is invalid.
   - AutoblockUserError: requested action on a virtual autoblock user not valid
   - TranslationError: no language translation found
   - UserRightsError: insufficient rights for requested action
@@ -193,9 +193,9 @@ class Error(Exception):
 
     """Pywikibot error."""
 
-    def __init__(self, arg: str) -> None:
+    def __init__(self, arg: Union[Exception, str]) -> None:
         """Initializer."""
-        self.unicode = arg
+        self.unicode = str(arg)
 
     def __str__(self) -> str:
         """Return a string representation."""
@@ -225,10 +225,10 @@ class APIError(Error):
                 self.code,
                 self.info,
                 ';\n '.join(
-                    '{}: {}'.format(key, val)
+                    f'{key}: {val}'
                     for key, val in self.other.items()))
 
-        return '{}: {}'.format(self.code, self.info)
+        return f'{self.code}: {self.info}'
 
 
 class APIMWError(APIError):
@@ -343,7 +343,7 @@ class OtherPageSaveError(PageSaveRelatedError):
 
 class NoUsernameError(Error):
 
-    """Username is not in user-config.py."""
+    """Username is not in user config file (user-config.py)."""
 
 
 class NoPageError(PageRelatedError):
@@ -386,7 +386,7 @@ class InconsistentTitleError(PageLoadRelatedError):
         :param actual: title obtained by query
 
         """
-        self.message = "Query on {{}} returned data on '{}'".format(actual)
+        self.message = f"Query on {{}} returned data on '{actual}'"
         super().__init__(page)
 
 

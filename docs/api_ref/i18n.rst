@@ -1,0 +1,6 @@
+****************************
+:mod:`i18n` --- i18n Support
+****************************
+
+.. automodule:: i18n
+   :synopsis: Various i18n functions

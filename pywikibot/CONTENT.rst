@@ -95,8 +95,6 @@ The contents of the package
     |                            +----------------+-------------------------------------+
     |                            | _generators.py | API/Query generators                |
     |                            +----------------+-------------------------------------+
-    |                            | _login.py      | API login interface                 |
-    |                            +----------------+-------------------------------------+
     |                            | _optionset.py  | Boolean API option                  |
     |                            +----------------+-------------------------------------+
     |                            | _paraminfo.py  | API information data object         |
@@ -118,6 +116,10 @@ The contents of the package
     +============================+======================================================+
     | __init__.py                | Interface representing MediaWiki pages               |
     +----------------------------+------------------------------------------------------+
+    | _basepage.py               | Base object for MediaWiki pages                      |
+    +----------------------------+------------------------------------------------------+
+    | _category.py               | Object representing MediaWiki categories             |
+    +----------------------------+------------------------------------------------------+
     | _collections.py            | Structures holding data for Wikibase entities        |
     +----------------------------+------------------------------------------------------+
     | _decorators.py             | Decorators used by page objects                      |
@@ -126,9 +128,11 @@ The contents of the package
     +----------------------------+------------------------------------------------------+
     | _links.py                  | Objects representing link objects                    |
     +----------------------------+------------------------------------------------------+
-    | _pages.py                  | Objects representing MediaWiki pages                 |
+    | _page.py                   | Object representing MediaWiki pages                  |
     +----------------------------+------------------------------------------------------+
     | _revision.py               | Object representing page revision                    |
+    +----------------------------+------------------------------------------------------+
+    | _toolforge.py              | BasePage interface to toolforge tools                |
     +----------------------------+------------------------------------------------------+
     | _user.py                   | Object representing a wiki user                      |
     +----------------------------+------------------------------------------------------+
@@ -158,15 +162,15 @@ The contents of the package
     |                            | WikiMedia family within seconds. Useful for bots     |
     |                            | running on multiple sites.                           |
     +----------------------------+------------------------------------------------------+
-    | pwb.py                     | Code entry wrapper script (site-package only)        |
-    +----------------------------+------------------------------------------------------+
     | shell.py                   | Spawns an interactive Python shell with pywikibot    |
     |                            | imported                                             |
     +----------------------------+------------------------------------------------------+
     | version.py                 | Outputs Pywikibot's revision number, Python's        |
     |                            | version and OS used.                                 |
     +----------------------------+------------------------------------------------------+
-    | i18n (folder)              | Contains i18n translations (site-package only)       |
+    | wrapper.py                 | Code entry wrapper script                            |
+    +----------------------------+------------------------------------------------------+
+    | i18n (folder)              | Contains i18n translations                           |
     +----------------------------+------------------------------------------------------+
 
 
@@ -232,6 +236,8 @@ The contents of the package
     | formatter.py               | Various formatting related utilities                 |
     +----------------------------+------------------------------------------------------+
     | itertools.py               | Iterator functions                                   |
+    +----------------------------+------------------------------------------------------+
+    | threading.py               | Threading classes                                    |
     +----------------------------+------------------------------------------------------+
 
 

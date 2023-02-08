@@ -4,18 +4,16 @@
 #
 # Distributed under the terms of the MIT license.
 #
+import bz2
 import gzip
 import hashlib
 import ipaddress
+import lzma
 import os
-import queue
 import re
 import stat
 import subprocess
 import sys
-import threading
-import time
-
 from contextlib import suppress
 from functools import total_ordering, wraps
 from importlib import import_module
@@ -45,23 +43,9 @@ from pywikibot.tools._unidata import _first_upper_exception
 
 pkg_Version = pkg_resources.packaging.version.Version  # noqa: N816
 
-try:
-    import bz2
-except ImportError as bz2_import_error:
-    try:
-        import bz2file as bz2
-        warn('package bz2 was not found; using bz2file', ImportWarning)
-    except ImportError:
-        warn('package bz2 and bz2file were not found', ImportWarning)
-        bz2 = bz2_import_error
-
-try:
-    import lzma
-except ImportError as lzma_import_error:
-    lzma = lzma_import_error
-
 
 __all__ = (
+    # deprecating functions
     'ModuleDeprecationWrapper',
     'add_decorated_full_name',
     'add_full_name',
@@ -74,7 +58,9 @@ __all__ = (
     'redirect_func',
     'remove_last_args',
 
+    # other tools
     'PYTHON_VERSION',
+    'as_filename',
     'is_ip_address',
     'has_module',
     'classproperty',
@@ -86,9 +72,6 @@ __all__ = (
     'normalize_username',
     'Version',
     'MediaWikiVersion',
-    'RLock',
-    'ThreadedGenerator',
-    'ThreadList',
     'SelfCallMixin',
     'SelfCallDict',
     'SelfCallString',
@@ -281,6 +264,11 @@ def first_lower(string: str) -> str:
 
     Empty strings are supported. The original string is not changed.
 
+    **Example**:
+
+    >>> first_lower('Hello World')
+    'hello World'
+
     .. versionadded:: 3.0
     """
     return string[:1].lower() + string[1:]
@@ -292,16 +280,60 @@ def first_upper(string: str) -> str:
 
     Empty strings are supported. The original string is not changed.
 
-    .. versionadded:: 3.0
+    **Example**:
 
-    .. note:: MediaWiki doesn't capitalize
-       some characters the same way as Python.
-       This function tries to be close to
-       MediaWiki's capitalize function in
-       title.php. See T179115 and T200357.
+    >>> first_upper('hello World')
+    'Hello World'
+
+    .. versionadded:: 3.0
+    .. note:: MediaWiki doesn't capitalize some characters the same way
+       as Python. This function tries to be close to MediaWiki's
+       capitalize function in title.php. See :phab:`T179115` and
+       :phab:`T200357`.
     """
     first = string[:1]
     return (_first_upper_exception(first) or first.upper()) + string[1:]
+
+
+def as_filename(string: str, repl: str = '_') -> str:
+    r"""Return a string with characters are valid for filenames.
+
+    Replace characters that are not possible in file names on some
+    systems, but still are valid in MediaWiki titles:
+
+        - Unix: ``/``
+        - MediaWiki: ``/:\\``
+        - Windows: ``/:\\"?*``
+
+    Spaces are possible on most systems, but are bad for URLs.
+
+    **Example**:
+
+    >>> as_filename('How are you?')
+    'How_are_you_'
+    >>> as_filename('Say: "Hello"')
+    'Say___Hello_'
+    >>> as_filename('foo*bar', '')
+    'foobar'
+    >>> as_filename('foo', 'bar')
+    Traceback (most recent call last):
+    ...
+    ValueError: Invalid repl parameter 'bar'
+    >>> as_filename('foo', '?')
+    Traceback (most recent call last):
+    ...
+    ValueError: Invalid repl parameter '?'
+
+    .. versionadded:: 8.0
+
+    :param string: the string to be modified
+    :param repl: the replacement character
+    :raises ValueError: Invalid repl parameter
+    """
+    pattern = r':*?/\\" '
+    if len(repl) > 1 or len(repl) == 1 and repl in pattern:
+        raise ValueError(f'Invalid repl parameter {repl!r}')
+    return re.sub(f'[{pattern}]', repl, string)
 
 
 def strtobool(val: str) -> bool:
@@ -309,6 +341,17 @@ def strtobool(val: str) -> bool:
 
     This is a reimplementation of distutils.util.strtobool due to
     :pep:`632#Migration Advice`
+
+    **Example**:
+
+    >>> strtobool('yes')
+    True
+    >>> strtobool('Off')
+    False
+    >>> strtobool('aye')
+    Traceback (most recent call last):
+    ...
+    ValueError: invalid truth value 'aye'
 
     .. versionadded:: 7.1
 
@@ -321,7 +364,7 @@ def strtobool(val: str) -> bool:
         return True
     if val in ('n', 'no', 'f', 'false', 'off', '0'):
         return False
-    raise ValueError('invalid truth value {!r}'.format(val))
+    raise ValueError(f'invalid truth value {val!r}')
 
 
 def normalize_username(username) -> Optional[str]:
@@ -395,7 +438,7 @@ class MediaWikiVersion:
     """
 
     MEDIAWIKI_VERSION = re.compile(
-        r'(\d+(?:\.\d+)+)(-?wmf\.?(\d+)|alpha|beta(\d+)|-?rc\.?(\d+)|.*)?$')
+        r'(\d+(?:\.\d+)+)(-?wmf\.?(\d+)|alpha|beta(\d+)|-?rc\.?(\d+)|.*)?')
 
     def __init__(self, version_str: str) -> None:
         """
@@ -406,37 +449,37 @@ class MediaWikiVersion:
         self._parse(version_str)
 
     def _parse(self, version_str: str) -> None:
-        version_match = MediaWikiVersion.MEDIAWIKI_VERSION.match(version_str)
+        version_match = MediaWikiVersion.MEDIAWIKI_VERSION.fullmatch(
+            version_str)
 
         if not version_match:
-            raise ValueError('Invalid version number "{}"'.format(version_str))
+            raise ValueError(f'Invalid version number "{version_str}"')
 
-        components = [int(n) for n in version_match.group(1).split('.')]
+        components = [int(n) for n in version_match[1].split('.')]
 
         # The _dev_version numbering scheme might change. E.g. if a stage
         # between 'alpha' and 'beta' is added, 'beta', 'rc' and stable releases
         # are reassigned (beta=3, rc=4, stable=5).
 
-        if version_match.group(3):  # wmf version
-            self._dev_version = (0, int(version_match.group(3)))
-        elif version_match.group(4):
-            self._dev_version = (2, int(version_match.group(4)))
-        elif version_match.group(5):
-            self._dev_version = (3, int(version_match.group(5)))
-        elif version_match.group(2) in ('alpha', '-alpha'):
+        if version_match[3]:  # wmf version
+            self._dev_version = (0, int(version_match[3]))
+        elif version_match[4]:
+            self._dev_version = (2, int(version_match[4]))
+        elif version_match[5]:
+            self._dev_version = (3, int(version_match[5]))
+        elif version_match[2] in ('alpha', '-alpha'):
             self._dev_version = (1, )
         else:
             for handled in ('wmf', 'alpha', 'beta', 'rc'):
                 # if any of those pops up here our parser has failed
-                assert handled not in version_match.group(2), \
-                    'Found "{}" in "{}"'.format(handled,
-                                                version_match.group(2))
-            if version_match.group(2):
-                pywikibot.logging.debug('Additional unused version part '
-                                        '"{}"'.format(version_match.group(2)))
+                assert handled not in version_match[2], \
+                    f'Found "{handled}" in "{version_match[2]}"'
+            if version_match[2]:
+                pywikibot.logging.debug(
+                    'Additional unused version part {version_match[2]!r}')
             self._dev_version = (4, )
 
-        self.suffix = version_match.group(2) or ''
+        self.suffix = version_match[2] or ''
         self.version = tuple(components)
 
     @staticmethod
@@ -473,214 +516,6 @@ class MediaWikiVersion:
         if self.version != other.version:
             return self.version < other.version
         return self._dev_version < other._dev_version
-
-
-class RLock:
-    """Context manager which implements extended reentrant lock objects.
-
-    This RLock is implicit derived from threading.RLock but provides a
-    locked() method like in threading.Lock and a count attribute which
-    gives the active recursion level of locks.
-
-    Usage:
-
-    >>> from pywikibot.tools import RLock
-    >>> lock = RLock()
-    >>> lock.acquire()
-    True
-    >>> with lock: print(lock.count)  # nested lock
-    2
-    >>> lock.locked()
-    True
-    >>> lock.release()
-    >>> lock.locked()
-    False
-
-    .. versionadded:: 6.2
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        """Initializer."""
-        self._lock = threading.RLock(*args, **kwargs)
-        self._block = threading.Lock()
-
-    def __enter__(self):
-        """Acquire lock and call atenter."""
-        return self._lock.__enter__()
-
-    def __exit__(self, *exc):
-        """Call atexit and release lock."""
-        return self._lock.__exit__(*exc)
-
-    def __getattr__(self, name):
-        """Delegate attributes and methods to self._lock."""
-        return getattr(self._lock, name)
-
-    def __repr__(self) -> str:
-        """Representation of tools.RLock instance."""
-        return repr(self._lock).replace(
-            '_thread.RLock',
-            '{cls.__module__}.{cls.__class__.__name__}'.format(cls=self))
-
-    @property
-    def count(self):
-        """Return number of acquired locks."""
-        with self._block:
-            counter = re.search(r'count=(\d+) ', repr(self))
-            return int(counter.group(1))
-
-    def locked(self):
-        """Return true if the lock is acquired."""
-        with self._block:
-            status = repr(self).split(maxsplit=1)[0][1:]
-            assert status in ('locked', 'unlocked')
-            return status == 'locked'
-
-
-class ThreadedGenerator(threading.Thread):
-
-    """Look-ahead generator class.
-
-    Runs a generator in a separate thread and queues the results; can
-    be called like a regular generator.
-
-    Subclasses should override self.generator, *not* self.run
-
-    Important: the generator thread will stop itself if the generator's
-    internal queue is exhausted; but, if the calling program does not use
-    all the generated values, it must call the generator's stop() method to
-    stop the background thread. Example usage:
-
-    >>> gen = ThreadedGenerator(target=range, args=(20,))
-    >>> try:
-    ...     data = list(gen)
-    ... finally:
-    ...     gen.stop()
-    >>> data
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-
-    .. versionadded:: 3.0
-    """
-
-    def __init__(self, group=None, target=None, name: str = 'GeneratorThread',
-                 args=(), kwargs=None, qsize: int = 65536) -> None:
-        """Initializer. Takes same keyword arguments as threading.Thread.
-
-        target must be a generator function (or other callable that returns
-        an iterable object).
-
-        :param qsize: The size of the lookahead queue. The larger the qsize,
-            the more values will be computed in advance of use (which can eat
-            up memory and processor time).
-        """
-        if kwargs is None:
-            kwargs = {}
-        if target:
-            self.generator = target
-        if not hasattr(self, 'generator'):
-            raise RuntimeError('No generator for ThreadedGenerator to run.')
-        self.args, self.kwargs = args, kwargs
-        super().__init__(group=group, name=name)
-        self.queue = queue.Queue(qsize)
-        self.finished = threading.Event()
-
-    def __iter__(self):
-        """Iterate results from the queue."""
-        if not self.is_alive() and not self.finished.is_set():
-            self.start()
-        # if there is an item in the queue, yield it, otherwise wait
-        while not self.finished.is_set():
-            try:
-                yield self.queue.get(True, 0.25)
-            except queue.Empty:
-                pass
-            except KeyboardInterrupt:
-                self.stop()
-
-    def stop(self) -> None:
-        """Stop the background thread."""
-        self.finished.set()
-
-    def run(self) -> None:
-        """Run the generator and store the results on the queue."""
-        iterable = any(hasattr(self.generator, key)
-                       for key in ('__iter__', '__getitem__'))
-        if iterable and not self.args and not self.kwargs:
-            self.__gen = self.generator
-        else:
-            self.__gen = self.generator(*self.args, **self.kwargs)
-        for result in self.__gen:
-            while True:
-                if self.finished.is_set():
-                    return
-                try:
-                    self.queue.put_nowait(result)
-                except queue.Full:
-                    time.sleep(0.25)
-                    continue
-                break
-        # wait for queue to be emptied, then kill the thread
-        while not self.finished.is_set() and not self.queue.empty():
-            time.sleep(0.25)
-        self.stop()
-
-
-class ThreadList(list):
-
-    """A simple threadpool class to limit the number of simultaneous threads.
-
-    Any threading.Thread object can be added to the pool using the append()
-    method. If the maximum number of simultaneous threads has not been reached,
-    the Thread object will be started immediately; if not, the append() call
-    will block until the thread is able to start.
-
-    >>> pool = ThreadList(limit=10)
-    >>> def work():
-    ...     time.sleep(1)
-    ...
-    >>> for x in range(20):
-    ...     pool.append(threading.Thread(target=work))
-    ...
-
-    """
-
-    def __init__(self, limit: int = 128, wait_time: float = 2, *args) -> None:
-        """Initializer.
-
-        :param limit: the number of simultaneous threads
-        :param wait_time: how long to wait if active threads exceeds limit
-        """
-        self.limit = limit
-        self.wait_time = wait_time
-        super().__init__(*args)
-        for item in self:
-            if not isinstance(item, threading.Thread):
-                raise TypeError("Cannot add '{}' to ThreadList"
-                                .format(type(item)))
-
-    def active_count(self):
-        """Return the number of alive threads and delete all non-alive ones."""
-        cnt = 0
-        for item in self[:]:
-            if item.is_alive():
-                cnt += 1
-            else:
-                self.remove(item)
-        return cnt
-
-    def append(self, thd):
-        """Add a thread to the pool and start it."""
-        if not isinstance(thd, threading.Thread):
-            raise TypeError("Cannot append '{}' to ThreadList"
-                            .format(type(thd)))
-
-        while self.active_count() >= self.limit:
-            time.sleep(self.wait_time)
-
-        super().append(thd)
-        thd.start()
-        pywikibot.logging.debug("thread {} ('{}') started"
-                                .format(len(self), type(thd)))
 
 
 class SelfCallMixin:
@@ -751,9 +586,6 @@ def open_archive(filename: str, mode: str = 'rb', use_extension: bool = True):
         immediately raise that error but only on reading it.
     :raises lzma.LZMAError: When error occurs during compression or
         decompression or when initializing the state with lzma or xz.
-    :raises ImportError: When file is compressed with bz2 but neither bz2 nor
-        bz2file is importable, or when file is compressed with lzma or xz but
-        lzma is not importable.
     :return: A file-like object returning the uncompressed data in binary mode.
     :rtype: file-like object
     """
@@ -769,7 +601,7 @@ def open_archive(filename: str, mode: str = 'rb', use_extension: bool = True):
     if mode in ('r', 'a', 'w'):
         mode += 'b'
     elif mode not in ('rb', 'ab', 'wb'):
-        raise ValueError('Invalid mode: "{}"'.format(mode))
+        raise ValueError(f'Invalid mode: "{mode}"')
 
     if use_extension:
         # if '.' not in filename, it'll be 1 character long but otherwise
@@ -789,8 +621,6 @@ def open_archive(filename: str, mode: str = 'rb', use_extension: bool = True):
             extension = ''
 
     if extension == 'bz2':
-        if isinstance(bz2, ImportError):
-            raise bz2
         binary = bz2.BZ2File(filename, mode)
 
     elif extension == 'gz':
@@ -814,12 +644,10 @@ def open_archive(filename: str, mode: str = 'rb', use_extension: bool = True):
         if stderr != b'':
             process.stdout.close()
             raise OSError(
-                'Unexpected STDERR output from 7za {}'.format(stderr))
+                f'Unexpected STDERR output from 7za {stderr}')
         binary = process.stdout
 
     elif extension in ('lzma', 'xz'):
-        if isinstance(lzma, ImportError):
-            raise lzma
         lzma_fmts = {'lzma': lzma.FORMAT_ALONE, 'xz': lzma.FORMAT_XZ}
         binary = lzma.open(filename, mode, format=lzma_fmts[extension])
 
@@ -836,7 +664,7 @@ def merge_unique_dicts(*args, **kwargs):
     The positional arguments are the dictionaries to be merged. It is also
     possible to define an additional dict using the keyword arguments.
 
-    .. versionadded: 3.0
+    .. versionadded:: 3.0
     """
     args = list(args) + [dict(kwargs)]
     conflicts = set()
@@ -859,7 +687,7 @@ def file_mode_checker(
 ):
     """Check file mode and update it, if needed.
 
-    .. versionadded: 3.0
+    .. versionadded:: 3.0
 
     :param filename: filename path
     :param mode: requested file mode
@@ -888,7 +716,7 @@ def compute_file_hash(filename: str, sha: str = 'sha1', bytes_to_read=None):
 
     Result is expressed as hexdigest().
 
-    .. versionadded: 3.0
+    .. versionadded:: 3.0
 
     :param filename: filename path
     :param sha: hashing function among the following in hashlib:
@@ -1010,3 +838,17 @@ wrapper.add_deprecated_attr(
     'filter_unique',
     replacement_name='pywikibot.tools.itertools.filter_unique',
     since='7.6.0')
+
+# Deprecate objects which has to be imported from tools.threading instead
+wrapper.add_deprecated_attr(
+    'RLock',
+    replacement_name='pywikibot.tools.threading.RLock',
+    since='7.7.0')
+wrapper.add_deprecated_attr(
+    'ThreadedGenerator',
+    replacement_name='pywikibot.tools.threading.ThreadedGenerator',
+    since='7.7.0')
+wrapper.add_deprecated_attr(
+    'ThreadList',
+    replacement_name='pywikibot.tools.threading.ThreadList',
+    since='7.7.0')

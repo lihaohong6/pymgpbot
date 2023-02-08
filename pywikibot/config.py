@@ -5,28 +5,33 @@ User preferences are loaded from a python file called `user-config.py`,
 which may be located in directory specified by the environment variable
 `PYWIKIBOT_DIR`, or the same directory as `pwb.py`, or in a directory
 within the users home. See :py:obj:`get_base_dir` for more information.
+The different file name can specified with global `-config` option.
 
-If user-config.py cannot be found in any of those locations, this module
-will fail to load unless the environment variable `PYWIKIBOT_NO_USER_CONFIG`
-is set to a value other than `'0'`. i.e. `PYWIKIBOT_NO_USER_CONFIG=1` will
-allow config to load without a `user-config.py`. However, warnings will be
-shown if `user-config.py` was not loaded. To prevent these warnings, set
-`PYWIKIBOT_NO_USER_CONFIG=2`. If Pywikibot is installed as a site-package
-the behaviour is like `PYWIKIBOT_NO_USER_CONFIG=2` is set.
+If user config file cannot be found in any of those locations, this
+module will fail to load unless the environment variable
+`PYWIKIBOT_NO_USER_CONFIG` is set to a value other than `'0'`. i.e.
+`PYWIKIBOT_NO_USER_CONFIG=1` will allow config to load without a user
+config file. However, warnings will be shown if a user config file was
+not loaded. To prevent these warnings, set `PYWIKIBOT_NO_USER_CONFIG=2`.
+If Pywikibot is installed as a site-package the behaviour is like
+`PYWIKIBOT_NO_USER_CONFIG=2` is set.
 
-Functions made available to `user-config`:
+Functions made available to user config file:
 
  - user_home_path
 
-Sets module global base_dir and provides utility methods to
-build paths relative to base_dir:
+Sets module global `base_dir` and `user_config_file` and provides
+utility methods to build paths relative to base_dir:
 
  - makepath
  - datafilepath
  - shortpath
 
-.. versionchanged 6.2::
+.. versionchanged:: 6.2
    config2 was renamed to config
+.. versionchanged:: 8.0
+   Editor settings has been revised. *editor* variable is None by
+   default. Editor detection functions were moved to :mod:`editor`.
 """
 #
 # (C) Pywikibot team, 2003-2022
@@ -57,6 +62,7 @@ from pywikibot.backports import (
     List,
     Mapping,
     Tuple,
+    removeprefix,
     removesuffix,
 )
 from pywikibot.logging import error, output, warning
@@ -69,8 +75,6 @@ _ValueType = TypeVar('_ValueType')
 
 OSWIN32 = (sys.platform == 'win32')
 
-if OSWIN32:
-    import winreg
 
 # This frozen set should contain all imported modules/variables, so it must
 # occur directly after the imports. At that point globals() only contains the
@@ -90,14 +94,14 @@ class _ConfigurationDeprecationWarning(UserWarning):
 
 
 # IMPORTANT:
-# Do not change any of the variables in this file. Instead, make
-# a file user-config.py, and overwrite values in there.
+# Do not change any of the variables in this file. Instead, make a
+# user config file (user-config.py), and overwrite values in there.
 
-# Note: all variables defined in this module are made available to bots as
-# configuration settings, *except* variable names beginning with an
+# Note: all variables defined in this module are made available to bots
+# as configuration settings, *except* variable names beginning with an
 # underscore (example: _variable). Be sure to use an underscore on any
-# variables that are intended only for internal use and not to be exported
-# to other modules.
+# variables that are intended only for internal use and not to be
+# exported to other modules.
 
 _private_values = {'authenticate', 'db_password'}
 _deprecated_variables = {
@@ -131,7 +135,7 @@ mylang = 'language'
 
 # The dictionary usernames should contain a username for each site where you
 # have a bot account. Please set your usernames by adding such lines to your
-# user-config.py:
+# user config file (user-config.py):
 #
 # usernames['wikipedia']['de'] = 'myGermanUsername'
 # usernames['wiktionary']['en'] = 'myEnglishUsername'
@@ -141,8 +145,8 @@ mylang = 'language'
 # usernames['wikibooks']['*'] = 'mySingleUsername'
 # You may use '*' for family name in a similar manner.
 #
-usernames = collections.defaultdict(dict)  # type: Dict[str, Dict[str, str]]
-disambiguation_comment = collections.defaultdict(dict)  # type: _DabComDict
+usernames: Dict[str, Dict[str, str]] = collections.defaultdict(dict)
+disambiguation_comment: _DabComDict = collections.defaultdict(dict)
 
 # User agent format.
 # For the meaning and more help in customization see:
@@ -167,7 +171,7 @@ fake_user_agent_default = {'reflinks': False, 'weblinkchecker': False}
 # True for enabling, False for disabling, str to hardcode a UA.
 # Example: {'problematic.site.example': True,
 #           'prefers.specific.ua.example': 'snakeoil/4.2'}
-fake_user_agent_exceptions = {}  # type: Dict[str, Union[bool, str]]
+fake_user_agent_exceptions: Dict[str, Union[bool, str]] = {}
 
 # The default interface for communicating with the site
 # currently the only defined interface is 'APISite', so don't change this!
@@ -187,9 +191,9 @@ enable_GET_without_SSL = False
 # exception CaptchaError being thrown if a captcha is encountered.
 solve_captcha = True
 
-# Some sites will require password authentication to access the HTML pages at
-# the site. If you have any such site, add lines to your user-config.py of
-# the following form:
+# Some sites will require password authentication to access the HTML
+# pages at the site. If you have any such site, add lines to your user
+# config file of the following form:
 #
 # authenticate['en.wikipedia.org'] = ('John','XXXXX')
 # authenticate['*.wikipedia.org'] = ('John','XXXXX')
@@ -207,7 +211,7 @@ solve_captcha = True
 # Pywikibot also support OAuth 1.0a via mwoauth
 # https://pypi.org/project/mwoauth
 #
-# You can add OAuth tokens to your user-config.py of the following form:
+# You can add OAuth tokens to your user config file of this form:
 #
 # authenticate['en.wikipedia.org'] = ('consumer_key','consumer_secret',
 #                                     'access_key', 'access_secret')
@@ -215,7 +219,7 @@ solve_captcha = True
 #                                    'access_key', 'access_secret')
 #
 # Note: the target wiki site must install OAuth extension
-authenticate = {}  # type: Dict[str, Tuple[str, ...]]
+authenticate: Dict[str, Tuple[str, ...]] = {}
 
 # By default you are asked for a password on the terminal.
 # A password file may be used, e.g. password_file = '.passwd'
@@ -255,6 +259,7 @@ default_edit_summary = 'Pywikibot ' + pwb_version
 # stat.S_IWOTH 0o002 write permission for others
 # stat.S_IXOTH 0o001 execute permission for others
 private_files_permission = stat.S_IRUSR | stat.S_IWUSR
+private_folder_permission = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
 
 # Allow user to stop warnings about file security
 # by setting this to true.
@@ -268,7 +273,7 @@ ignore_file_security_warnings = False
 #
 # Note that these headers will be sent with all requests,
 # not just MediaWiki API calls.
-extra_headers = {}  # type: Mapping[str, str]
+extra_headers: Mapping[str, str] = {}
 
 # Set to True to override the {{bots}} exclusion protocol (at your own risk!)
 ignore_bot_templates = False
@@ -281,7 +286,22 @@ def user_home_path(path: str) -> str:
     return os.path.join(os.path.expanduser('~'), path)
 
 
-def get_base_dir(test_directory: Optional[str] = None) -> str:
+def get_user_config_file() -> str:
+    """Return user config file name.
+
+    .. versionadded:: 7.7
+    """
+    for arg in sys.argv[1:]:
+        opt, _, value = arg.partition(':')
+        if opt == '-config':
+            if not value.endswith('.py'):
+                value += '.py'
+            return value
+    return 'user-config.py'
+
+
+def get_base_dir(test_directory: Optional[str] = None,
+                 config_file: str = 'user-config.py') -> str:
     r"""Return the directory in which user-specific information is stored.
 
     This is determined in the following order:
@@ -298,18 +318,22 @@ def get_base_dir(test_directory: Optional[str] = None) -> str:
          `'.pywikibot'` directory (Unix and similar) under the user's
          home directory.
 
-    Set `PYWIKIBOT_NO_USER_CONFIG=1` to disable loading `user-config.py`
-    or install Pywikibot as a site-package.
+    Set `PYWIKIBOT_NO_USER_CONFIG=1` to disable loading user config file
+    (`user-config.py`) or install Pywikibot as a site-package.
+
+    .. versionchanged:: 7.7
+       Added the *config_file* parameter.
 
     :param test_directory: Assume that a user config file exists in this
         directory. Used to test whether placing a user config file in this
         directory will cause it to be selected as the base directory.
+    :param config_file: filename of the user config file
     """
     def exists(directory: str) -> bool:
         directory = os.path.abspath(directory)
         if directory == test_directory:
             return True
-        return os.path.exists(os.path.join(directory, 'user-config.py'))
+        return os.path.exists(os.path.join(directory, config_file))
 
     if test_directory is not None:
         test_directory = os.path.abspath(test_directory)
@@ -317,7 +341,7 @@ def get_base_dir(test_directory: Optional[str] = None) -> str:
     base_dir = ''
     for arg in sys.argv[1:]:
         if arg.startswith('-dir:'):
-            base_dir = arg[5:]
+            base_dir = removeprefix(arg, '-dir:')
             base_dir = os.path.expanduser(base_dir)
             break
     else:
@@ -349,7 +373,7 @@ def get_base_dir(test_directory: Optional[str] = None) -> str:
             for dir_ in base_dir_cand:
                 dir_s = os.path.join(*dir_)
                 try:
-                    os.makedirs(dir_s, mode=private_files_permission)
+                    os.makedirs(dir_s, mode=private_folder_permission)
                 except OSError:  # PermissionError or already exists
                     if exists(dir_s):
                         base_dir = dir_s
@@ -357,21 +381,22 @@ def get_base_dir(test_directory: Optional[str] = None) -> str:
 
     if not os.path.isabs(base_dir):
         base_dir = os.path.normpath(os.path.join(os.getcwd(), base_dir))
+
     # make sure this path is valid and that it contains user-config file
     if not os.path.isdir(base_dir):
-        raise RuntimeError("Directory '{}' does not exist.".format(base_dir))
-    # check if user-config.py is in base_dir
+        raise RuntimeError(f"Directory '{base_dir}' does not exist.")
+
+    # check if config_file is in base_dir
     if not exists(base_dir):
-        exc_text = 'No user-config.py found in directory {!r}.\n'.format(
-            base_dir)
+        exc_text = f'No {config_file} found in directory {base_dir!r}.\n'
 
         if __no_user_config is None:
             assert get_base_dir.__doc__ is not None
             exc_text += (
-                '  Please check that user-config.py is stored in the correct '
-                'location.\n'
-                '  Directory where user-config.py is searched is determined '
-                'as follows:\n\n    ') + get_base_dir.__doc__
+                '\nPlease check that {0} is stored in the correct location.'
+                '\nDirectory where {0} is searched is determined as follows:'
+                '\n\n    '.format(config_file)
+            ) + get_base_dir.__doc__
             raise RuntimeError(exc_text)
 
         if __no_user_config != '2':
@@ -380,12 +405,15 @@ def get_base_dir(test_directory: Optional[str] = None) -> str:
     return base_dir
 
 
+user_config_file = get_user_config_file()
+
 # Save base_dir for use by other modules
-base_dir = get_base_dir()
+base_dir = get_base_dir(config_file=user_config_file)
 
 for arg in sys.argv[1:]:
     if arg.startswith('-verbose') or arg == '-v':
         output('The base directory is ' + base_dir)
+        output('The user config file is ' + user_config_file)
         break
 family_files = {}
 
@@ -496,7 +524,7 @@ userinterface = 'terminal'
 # this can be used to pass variables to the UI init function
 # useful for e.g.
 # userinterface_init_kwargs = {'default_stream': 'stdout'}
-userinterface_init_kwargs = {}  # type: Dict[str, str]
+userinterface_init_kwargs: Dict[str, str] = {}
 
 # i18n setting for user interface language
 # default is obtained from locale.getlocale
@@ -540,13 +568,18 @@ except AttributeError:
 
 # An indication of the size of your screen, or rather the size of the screen
 # to be shown, for flickrripper
-tkhorsize = 1600
-tkvertsize = 1000
+tkhorsize = 1280
+tkvertsize = 800
 
 # ############# EXTERNAL EDITOR SETTINGS ##############
-# The command for the editor you want to use. If set to None, a simple Tkinter
-# editor will be used.
-editor = os.environ.get('EDITOR')
+# The command for the editor you want to use. If set to True, Tkinter
+# editor will be used. If set to False, no editor will be used. In
+# script tests to be a noop (like /bin/true) so the script continues.
+# If set to None, the EDITOR environment variable will be used as
+# command. If EDITOR is not set, on windows plattforms it tries to
+# determine the default text editor from registry. Finally, Tkinter is
+# used as fallback.
+editor: Union[bool, str, None] = None
 
 # Warning: DO NOT use an editor which doesn't support Unicode to edit pages!
 # You will BREAK non-ASCII symbols!
@@ -569,9 +602,9 @@ editor_filename_extension = 'wiki'
 #     log = []
 # Per default, no logging is enabled.
 # This setting can be overridden by the -log or -nolog command-line arguments.
-log = []  # type: List[str]
+log: List[str] = []
 # filename defaults to modulename-bot.log
-logfilename = None  # type: Optional[str]
+logfilename: Optional[str] = None
 # maximal size of a logfile in kilobytes. If the size reached that limit the
 # logfile will be renamed (if logfilecount is not 0) and the old file is filled
 # again. logfilesize must be an integer value
@@ -589,7 +622,7 @@ verbose_output = 0
 log_pywiki_repo_version = False
 # if True, include a lot of debugging info in logfile
 # (overrides log setting above)
-debug_log = []  # type: List[str]
+debug_log: List[str] = []
 
 # ############# EXTERNAL SCRIPT PATH SETTINGS ##############
 # Set your own script path to lookup for your script files.
@@ -609,7 +642,7 @@ debug_log = []  # type: List[str]
 #
 # sample:
 # user_script_paths = ['scripts.myscripts']
-user_script_paths = []  # type: List[str]
+user_script_paths: List[str] = []
 
 # ############# EXTERNAL FAMILIES SETTINGS ##############
 # Set your own family path to lookup for your family files.
@@ -624,7 +657,7 @@ user_script_paths = []  # type: List[str]
 # samples:
 # family_files['mywiki'] = 'https://de.wikipedia.org'
 # user_families_paths = ['data/families']
-user_families_paths = []  # type: List[str]
+user_families_paths: List[str] = []
 
 # ############# INTERWIKI SETTINGS ##############
 
@@ -648,9 +681,9 @@ interwiki_min_subjects = 100
 
 # If interwiki graphs are enabled, which format(s) should be used?
 # Supported formats include png, jpg, ps, and svg. See:
-# http://www.graphviz.org/doc/info/output.html
+# https://graphviz.org/docs/outputs/
 # If you want to also dump the dot files, you can use this in your
-# user-config.py:
+# user config file:
 # interwiki_graph_formats = ['dot', 'png']
 # If you need a PNG image with an HTML image map, use this:
 # interwiki_graph_formats = ['png', 'cmap']
@@ -702,7 +735,7 @@ maxthrottle = 60
 
 # Slow down the robot such that it never makes a second page edit within
 # 'put_throttle' seconds.
-put_throttle = 10  # type: Union[int, float]
+put_throttle: Union[int, float] = 10
 
 # Sometimes you want to know when a delay is inserted. If a delay is larger
 # than 'noisysleep' seconds, it is logged on the screen.
@@ -787,21 +820,21 @@ cosmetic_changes_mylang_only = True
 # The dictionary cosmetic_changes_enable should contain a tuple of languages
 # for each site where you wish to enable in addition to your own langlanguage
 # (if cosmetic_changes_mylang_only is set)
-# Please set your dictionary by adding such lines to your user-config.py:
+# Please set your dictionary by adding such lines to your user config file:
 # cosmetic_changes_enable['wikipedia'] = ('de', 'en', 'fr')
-cosmetic_changes_enable = {}  # type: Dict[str, Tuple[str, ...]]
+cosmetic_changes_enable: Dict[str, Tuple[str, ...]] = {}
 
 # The dictionary cosmetic_changes_disable should contain a tuple of languages
 # for each site where you wish to disable cosmetic changes. You may use it with
 # cosmetic_changes_mylang_only is False, but you can also disable your own
 # language. This also overrides the settings in the cosmetic_changes_enable
-# dictionary. Please set your dict by adding such lines to your user-config.py:
+# dictionary. Please set your dict by adding such lines to your user config:
 # cosmetic_changes_disable['wikipedia'] = ('de', 'en', 'fr')
-cosmetic_changes_disable = {}  # type: Dict[str, Tuple[str, ...]]
+cosmetic_changes_disable: Dict[str, Tuple[str, ...]] = {}
 
 # cosmetic_changes_deny_script is a list of scripts for which cosmetic changes
 # are disabled. You may add additional scripts by appending script names in
-# your user-config.py ("+=" operator is strictly recommended):
+# your user config file ("+=" operator is strictly recommended):
 # cosmetic_changes_deny_script += ['your_script_name_1', 'your_script_name_2']
 # Appending the script name also works:
 # cosmetic_changes_deny_script.append('your_script_name')
@@ -809,7 +842,7 @@ cosmetic_changes_deny_script = ['category_redirect', 'cosmetic_changes',
                                 'newitem', 'touch']
 
 # ############# REPLICATION BOT SETTINGS ################
-# You can add replicate_replace to your user-config.py.
+# You can add replicate_replace to your user config file.
 #
 # Use has the following format:
 #
@@ -819,7 +852,7 @@ cosmetic_changes_deny_script = ['category_redirect', 'cosmetic_changes',
 #
 # to replace all occurrences of 'Hoofdpagina' with 'Veurblaad' when writing to
 # liwiki. Note that this does not take the origin wiki into account.
-replicate_replace = {}  # type: Dict[str, Dict[str, str]]
+replicate_replace: Dict[str, Dict[str, str]] = {}
 
 # ############# FURTHER SETTINGS ##############
 
@@ -828,12 +861,12 @@ replicate_replace = {}  # type: Dict[str, Dict[str, str]]
 # Defines what additional actions the bots are NOT allowed to do (e.g. 'edit')
 # on the wiki server. Allows simulation runs of bots to be carried out without
 # changing any page on the server side. Use this setting to add more actions
-# in user-config.py for wikis with extra write actions.
-actions_to_block = []  # type: List[str]
+# into user config file for wikis with extra write actions.
+actions_to_block: List[str] = []
 
 # Set simulate to True or use -simulate option to block all actions given
 # above.
-simulate = False  # type: Union[bool, str]
+simulate: Union[bool, str] = False
 
 # How many pages should be put to a queue in asynchronous mode.
 # If maxsize is <= 0, the queue size is infinite.
@@ -901,51 +934,6 @@ def shortpath(path: str) -> str:
     return path
 
 
-def _win32_extension_command(extension: str) -> Optional[str]:
-    """Get the command from the Win32 registry for an extension."""
-    fileexts_key = \
-        r'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts'
-    key_name = fileexts_key + r'\.' + extension + r'\OpenWithProgids'
-    try:
-        key1 = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_name)
-        _prog_id = winreg.EnumValue(key1, 0)[0]
-        _key2 = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT,
-                               r'{}\shell\open\command'.format(_prog_id))
-        _cmd = winreg.QueryValueEx(_key2, '')[0]
-        # See T102465 for issues relating to using this value.
-        cmd = _cmd
-        if cmd.find('%1'):
-            cmd = cmd[:cmd.find('%1')]
-            # Remove any trailing character, which should be a quote or space
-            # and then remove all whitespace.
-            return cmd[:-1].strip()
-    except OSError as e:
-        # Catch any key lookup errors
-        output('Unable to detect program for file extension "{}": {!r}'
-               .format(extension, e))
-    return None
-
-
-def _detect_win32_editor() -> Optional[str]:
-    """Detect the best Win32 editor."""
-    # Notepad is even worse than our Tkinter editor.
-    unusable_exes = ['notepad.exe',
-                     'py.exe',
-                     'pyw.exe',
-                     'python.exe',
-                     'pythonw.exe']
-
-    for ext in ['py', 'txt']:
-        editor = _win32_extension_command(ext)
-        if editor:
-            for unusable in unusable_exes:
-                if unusable in editor.lower():
-                    break
-            else:
-                return editor
-    return None
-
-
 # System-level and User-level changes.
 # Store current variables and their types.
 _public_globals = {
@@ -958,20 +946,20 @@ _public_globals = {
 _exec_globals = copy.deepcopy(_public_globals)
 
 # Always try to get the user files
-_filename = os.path.join(base_dir, 'user-config.py')
+_filename = os.path.join(base_dir, user_config_file)
 if os.path.exists(_filename):
     _filestatus = os.stat(_filename)
     _filemode = _filestatus[0]
     _fileuid = _filestatus[4]
     if not OSWIN32 and _fileuid not in [os.getuid(), 0]:
-        warning('Skipped {fn!r}: owned by someone else.'.format(fn=_filename))
+        warning(f'Skipped {_filename!r}: owned by someone else.')
     elif OSWIN32 or _filemode & 0o02 == 0:
         with open(_filename, 'rb') as f:
             exec(compile(f.read(), _filename, 'exec'), _exec_globals)
     else:
-        warning('Skipped {fn!r}: writeable by others.'.format(fn=_filename))
+        warning(f'Skipped {_filename!r}: writeable by others.')
 elif __no_user_config and __no_user_config != '2':
-    warning('user-config.py cannot be loaded.')
+    warning(f'{user_config_file} cannot be loaded.')
 
 
 class _DifferentTypeError(UserWarning, TypeError):
@@ -986,8 +974,8 @@ class _DifferentTypeError(UserWarning, TypeError):
     ) -> None:
         super().__init__(
             'Configuration variable "{}" is defined as "{}" in '
-            'your user-config.py but expected "{}".'
-            .format(name, actual_type.__name__,
+            'your {} but expected "{}".'
+            .format(name, actual_type.__name__, user_config_file,
                     '", "'.join(t.__name__ for t in allowed_types)))
 
 
@@ -1017,9 +1005,9 @@ def _assert_types(
 
 
 DEPRECATED_VARIABLE = (
-    '"{}" present in our user-config.py is no longer a supported '
-    'configuration variable and should be removed. Please inform the '
-    'maintainers if you depend on it.')
+    '"{{}}" present in our {} is no longer a supported configuration variable '
+    'and should be removed. Please inform the maintainers if you depend on it.'
+    .format(user_config_file))
 
 
 def _check_user_config_types(
@@ -1046,9 +1034,9 @@ def _check_user_config_types(
                      _ConfigurationDeprecationWarning)
             elif name not in _future_variables:
                 warn('\n' + fill('Configuration variable "{}" is defined in '
-                                 'your user-config.py but unknown. It can be '
-                                 'a misspelled one or a variable that is no '
-                                 'longer supported.'.format(name)),
+                                 'your {} but unknown. It can be a misspelled '
+                                 'one or a variable that is no longer '
+                                 'supported.'.format(name, user_config_file)),
                      UserWarning)
 
 
@@ -1083,18 +1071,6 @@ for _key in _modified:
 if console_encoding is None:
     console_encoding = 'utf-8'
 
-if OSWIN32 and editor is None:
-    editor = _detect_win32_editor()
-
-# single character string literals from
-# https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
-# encode('unicode-escape') also changes Unicode characters
-if OSWIN32 and editor and set(editor) & set('\a\b\f\n\r\t\v'):
-    warning(
-        'The editor path contains probably invalid escaped characters. Make '
-        'sure to use a raw-string (r"..." or r\'...\'), forward slashes as a '
-        'path delimiter or to escape the normal path delimiter.')
-
 if userinterface_lang is None:
     userinterface_lang = os.getenv('PYWIKIBOT_USERINTERFACE_LANG') \
         or getlocale()[0]
@@ -1111,15 +1087,18 @@ if family == 'wikipedia' and mylang == 'language':
     mylang = 'test'
 
 # SECURITY WARNINGS
-if (not ignore_file_security_warnings
-        and private_files_permission & (stat.S_IRWXG | stat.S_IRWXO) != 0):
-    error("CRITICAL SECURITY WARNING: 'private_files_permission' is set"
-          ' to allow access from the group/others which'
-          ' could give them access to the sensitive files.'
-          ' To avoid giving others access to sensitive files, pywikibot'
-          " won't run with this setting. Choose a more restrictive"
-          " permission or set 'ignore_file_security_warnings' to true.")
-    sys.exit(1)
+if not ignore_file_security_warnings:
+    for _permission in ('private_files_permission',
+                        'private_folder_permission'):
+        if locals()[_permission] & (stat.S_IRWXG | stat.S_IRWXO) != 0:
+            error('\n' + fill(
+                f'CRITICAL SECURITY WARNING: {_permission!r} is set to allow'
+                ' access from the group/others which could give them access'
+                ' to the sensitive files. To avoid giving others access to'
+                " sensitive files, pywikibot won't run with this setting."
+                ' Choose a more restrictive permission or set'
+                " 'ignore_file_security_warnings' to true."))
+            sys.exit(1)
 
 # Setup custom family files
 for file_path in user_families_paths:
@@ -1135,7 +1114,7 @@ if __name__ == '__main__':  # pragma: no cover
         if _arg == 'modified':
             _all = False
         else:
-            warning('Unknown arg {} ignored'.format(_arg))
+            warning(f'Unknown arg {_arg} ignored')
 
     for _name in sorted(globals()):
         if _name[0] != '_' \
@@ -1153,7 +1132,7 @@ if __name__ == '__main__':  # pragma: no cover
                           + '( ...xxxxxxxx... )')
             else:
                 _value = repr('xxxxxxxx')
-            output('{}={}'.format(_name, _value))
+            output(f'{_name}={_value}')
 
 # cleanup all locally-defined variables
 for __var in list(globals()):

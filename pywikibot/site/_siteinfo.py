@@ -29,7 +29,7 @@ class Siteinfo(Container):
     """
 
     WARNING_REGEX = re.compile(r'Unrecognized values? for parameter '
-                               r'["\']siprop["\']: (.+?)\.?$')
+                               r'["\']siprop["\']: (.+?)\.?')
 
     # Until we get formatversion=2, we have to convert empty-string properties
     # into booleans so they are easier to use.
@@ -63,7 +63,7 @@ class Siteinfo(Container):
     def clear(self) -> None:
         """Remove all items from Siteinfo.
 
-        .. versionadded: 7.1
+        .. versionadded:: 7.1
         """
         self._cache.clear()
 
@@ -77,11 +77,11 @@ class Siteinfo(Container):
          - 'semiprotectedlevels': 'autoconfirmed'
          - 'levels': '' (everybody), 'autoconfirmed', 'sysop'
          - 'types': 'create', 'edit', 'move', 'upload'
-        Otherwise it returns :py:obj:`pywikibot.tools.EMPTY_DEFAULT`.
+        Otherwise it returns :py:obj:`tools.EMPTY_DEFAULT`.
 
         :param key: The property name
         :return: The default value
-        :rtype: dict or :py:obj:`pywikibot.tools.EmptyDefault`
+        :rtype: dict or :py:obj:`tools.EmptyDefault`
         """
         if key == 'restrictions':
             # implemented in b73b5883d486db0e9278ef16733551f28d9e096d
@@ -139,10 +139,10 @@ class Siteinfo(Container):
         """
         def warn_handler(mod, message) -> bool:
             """Return True if the warning is handled."""
-            matched = Siteinfo.WARNING_REGEX.match(message)
+            matched = Siteinfo.WARNING_REGEX.fullmatch(message)
             if mod == 'siteinfo' and matched:
                 invalid_properties.extend(
-                    prop.strip() for prop in matched.group(1).split(','))
+                    prop.strip() for prop in matched[1].split(','))
                 return True
             return False
 
@@ -169,7 +169,7 @@ class Siteinfo(Container):
             if e.code == 'siunknown_siprop':
                 if len(props) == 1:
                     pywikibot.log(
-                        "Unable to get siprop '{}'".format(props[0]))
+                        f"Unable to get siprop '{props[0]}'")
                     return {props[0]: (Siteinfo._get_default(props[0]), False)}
                 pywikibot.log('Unable to get siteinfo, because at least '
                               "one property is unknown: '{}'".format(

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Tests for archivebot scripts."""
 #
-# (C) Pywikibot team, 2014-2022
+# (C) Pywikibot team, 2014-2023
 #
 # Distributed under the terms of the MIT license.
 #
@@ -84,7 +84,7 @@ class TestArchiveBotFunctions(TestCase):
         self.assertEqual(archivebot.str2size('0'), (0, 'B'))
         self.assertEqual(archivebot.str2size('3000'), (3000, 'B'))
         self.assertEqual(archivebot.str2size('4 K'), (4096, 'B'))
-        self.assertEqual(archivebot.str2size('1 M'), (1048576, 'B'))
+        self.assertEqual(archivebot.str2size('1 M'), (1_048_576, 'B'))
         self.assertEqual(archivebot.str2size('2T'), (2, 'T'))
         self.assertEqual(archivebot.str2size('2 000'), (2000, 'B'))
         self.assertEqual(archivebot.str2size('2 000B'), (2000, 'B'))
@@ -112,6 +112,7 @@ class TestArchiveBot(TestCase):
     sites = {code: {'family': 'wikipedia', 'code': code} for code in THREADS}
 
     cached = True
+    expected_failures = ['ar', 'scn', 'th']
 
     def test_archivebot(self, code=None):
         """Test archivebot for one site."""
@@ -142,7 +143,6 @@ class TestArchiveBot(TestCase):
                 self.assertIsInstance(thread.content, str)
                 self.assertIsInstance(thread.timestamp, datetime)
 
-    expected_failures = ['ar', 'eo', 'pdc', 'scn', 'th']
     # FIXME: see TestArchiveBotAfterDateUpdate()
     # 'ar': Uses Arabic acronym for TZ
     # 'eo': changed month name setting in wiki from Sep to sep
@@ -269,7 +269,7 @@ class TestDiscussionPageObject(TestCase):
         """Test DiscussionPage.is_full method."""
         self.load_page('Talk:For-pywikibot-archivebot')
         page = self.page
-        self.assertEqual(page.archiver.maxsize, 2096128)
+        self.assertEqual(page.archiver.maxsize, 2_096_128)
         self.assertEqual(page.size(), 181)
         self.assertTrue(page.is_full((100, 'B')))
         page.full = False
@@ -295,12 +295,12 @@ class TestPageArchiverObject(TestCase):
     def testLoadConfigInTemplateNamespace(self):
         """Test loading of config with TEMPLATE_PAGE in Template ns.
 
-        Talk:For-pywikibot-archivebot-01 must have:
+        Talk:For-pywikibot-archivebot-01 must have::
 
-         {{Pywikibot_archivebot
-         |archive = Talk:Main_Page/archive
-         |algo = old(30d)
-         }}
+            {{Pywikibot_archivebot
+            |archive = Talk:Main_Page/archive
+            |algo = old(30d)
+            }}
         """
         site = self.get_site()
         page = pywikibot.Page(site, 'Talk:For-pywikibot-archivebot-01')
@@ -311,23 +311,23 @@ class TestPageArchiverObject(TestCase):
 
         try:
             archivebot.PageArchiver(page, tmpl_with_ns, '')
-        except Error as e:
-            self.fail('PageArchiver() raised {}!'.format(e))
+        except Error as e:  # pragma: no cover
+            self.fail(f'PageArchiver() raised {e}!')
 
         try:
             archivebot.PageArchiver(page, tmpl_without_ns, '')
-        except Error as e:
-            self.fail('PageArchiver() raised {}!'.format(e))
+        except Error as e:  # pragma: no cover
+            self.fail(f'PageArchiver() raised {e}!')
 
     def testLoadConfigInOtherNamespace(self):
         """Test loading of config with TEMPLATE_PAGE not in Template ns.
 
-        Talk:For-pywikibot-archivebot must have:
+        Talk:For-pywikibot-archivebot must have::
 
-         {{User:MiszaBot/config
-         |archive = Talk:Main_Page/archive
-         |algo = old(30d)
-         }}
+            {{User:MiszaBot/config
+            |archive = Talk:Main_Page/archive
+            |algo = old(30d)
+            }}
         """
         site = self.get_site()
         page = pywikibot.Page(site, 'Talk:For-pywikibot-archivebot')
@@ -338,8 +338,8 @@ class TestPageArchiverObject(TestCase):
         # TEMPLATE_PAGE assumed in ns=10 if ns is not explicit.
         try:
             archivebot.PageArchiver(page, tmpl_with_ns, '')
-        except Error as e:
-            self.fail('PageArchiver() raised {}!'.format(e))
+        except Error as e:  # pragma: no cover
+            self.fail(f'PageArchiver() raised {e}!')
 
         with self.assertRaises(archivebot.MissingConfigError):
             archivebot.PageArchiver(page, tmpl_without_ns, '')

@@ -1,15 +1,18 @@
+###############
 Scripts package
----------------
+###############
 
 .. automodule:: scripts
    :no-members:
+   :noindex:
 
 .. include:: ../../scripts/README.rst
    :start-after: included.
    :end-before: More precise
 
-Scripts descriptions
---------------------
+*******************
+Script descriptions
+*******************
 
 .. toctree::
    :maxdepth: 1

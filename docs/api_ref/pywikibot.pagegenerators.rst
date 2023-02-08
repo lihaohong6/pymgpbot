@@ -1,20 +1,24 @@
-pagegenerators package
-======================
+*****************************************
+:mod:`pagegenerators` --- Page Generators
+*****************************************
 
-.. automodule:: pywikibot.pagegenerators
+.. automodule:: pagegenerators
+   :synopsis: This module offers a wide variety of page generators
 
-pagegenerators.\_factory module
--------------------------------
+:mod:`pagegenerators.\_factory` --- Pagegenerators Options Handler
+==================================================================
 
-.. automodule:: pywikibot.pagegenerators._factory
+.. automodule:: pagegenerators._factory
+   :synopsis: GeneratorFactory module wich handles pagegenerators options
 
-pagegenerators.\_filters module
--------------------------------
+:mod:`pagegenerators.\_filters` --- Filter Funtions
+===================================================
 
-.. automodule:: pywikibot.pagegenerators._filters
+.. automodule:: pagegenerators._filters
+   :synopsis: Page filter generators provided by the pagegenerators module
 
-pagegenerators.\_generators module
-----------------------------------
+:mod:`pagegenerators.\_generators` --- Generator Functions
+==========================================================
 
-.. automodule:: pywikibot.pagegenerators._generators
-
+.. automodule:: pagegenerators._generators
+   :synopsis: Page filter generators provided by the pagegenerators module

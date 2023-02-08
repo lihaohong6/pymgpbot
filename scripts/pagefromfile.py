@@ -67,13 +67,13 @@ can be added between them by specifying '\n' as a value.
 import codecs
 import os
 import re
-from typing import Generator
 
 import pywikibot
 from pywikibot import config, i18n
-from pywikibot.backports import Tuple
+from pywikibot.backports import Iterator, Tuple
 from pywikibot.bot import CurrentPageBot, OptionHandler, SingleSiteBot
 from pywikibot.pagegenerators import PreloadingGenerator
+from pywikibot.tools.collections import GeneratorWrapper
 
 
 CTX_ATTR = '_content_ctx'
@@ -129,16 +129,14 @@ class PageFromFileRobot(SingleSiteBot, CurrentPageBot):
 
         if page.exists():
             if not self.opt.redirect and page.isRedirectPage():
-                pywikibot.output('Page {} is redirect, skipping!'
-                                 .format(title))
+                pywikibot.info(f'Page {title} is redirect, skipping!')
                 return
             pagecontents = page.text
             nocontent = self.opt.nocontent
             if (nocontent
                     and (nocontent in pagecontents
                          or nocontent.lower() in pagecontents)):
-                pywikibot.output('Page has {} so it is skipped'
-                                 .format(nocontent))
+                pywikibot.info(f'Page has {nocontent} so it is skipped')
                 return
             if self.opt.append:
                 separator = self.opt.append[1]
@@ -150,16 +148,14 @@ class PageFromFileRobot(SingleSiteBot, CurrentPageBot):
                 else:
                     above, below = pagecontents, contents
                     comment = comment_bottom
-                pywikibot.output('Page {} already exists, appending on {}!'
-                                 .format(title, self.opt.append[0]))
+                pywikibot.info(f'Page {title} already exists, appending on '
+                               f'{self.opt.append[0]}!')
                 contents = above + separator + below
             elif self.opt.force:
-                pywikibot.output('Page {} already exists, ***overwriting!'
-                                 .format(title))
+                pywikibot.info(f'Page {title} already exists, ***overwriting!')
                 comment = comment_force
             else:
-                pywikibot.output('Page {} already exists, not adding!'
-                                 .format(title))
+                pywikibot.info(f'Page {title} already exists, not adding!')
                 return
         else:
             if self.opt.autosummary:
@@ -170,9 +166,13 @@ class PageFromFileRobot(SingleSiteBot, CurrentPageBot):
                          show_diff=self.opt.showdiff)
 
 
-class PageFromFileReader(OptionHandler):
+class PageFromFileReader(OptionHandler, GeneratorWrapper):
 
-    """Generator class, responsible for reading the file."""
+    """Generator class, responsible for reading the file.
+
+    .. versionchanged:: 7.6
+       subclassed from :class:`pywikibot.tools.collections.GeneratorWrapper`
+    """
 
     # Adapt these to the file you are using. 'begin' and
     # 'end' are the beginning and end of each entry. Take text that
@@ -191,53 +191,14 @@ class PageFromFileReader(OptionHandler):
     }
 
     def __init__(self, filename, site=None, **kwargs) -> None:
-        """Initializer.
-
-        Check if self.file name exists. If not, ask for a new filename.
-        User can quit.
-
-        """
+        """Initializer."""
         super().__init__(**kwargs)
         self.filename = filename
         self.site = site or pywikibot.Site()
+        self.page_regex, self.title_regex = self._make_regexes()
 
-    def __iter__(self) -> Generator[pywikibot.Page, None, None]:
-        """Read file and yield a tuple of page title and content."""
-        pywikibot.output("\n\nReading '{}'...".format(self.filename))
-        try:
-            with codecs.open(self.filename, 'r',
-                             encoding=config.textfile_encoding) as f:
-                text = f.read()
-
-        except OSError as e:
-            pywikibot.error(e)
-            return
-
-        position = 0
-        length = 0
-        while True:
-            try:
-                length, title, contents = self.findpage(text[position:])
-            except AttributeError:
-                if not length:
-                    pywikibot.output('\nStart or end marker not found.')
-                else:
-                    pywikibot.output('End of file.')
-                break
-            except NoTitleError as err:
-                pywikibot.output('\nNo title found - skipping a page.')
-                position += err.offset
-                continue
-            if length == 0:
-                break
-            position += length
-
-            page = pywikibot.Page(self.site, title)
-            setattr(page, CTX_ATTR, contents.strip())
-            yield page
-
-    def findpage(self, text) -> Tuple[int, str, str]:
-        """Find page to work on."""
+    def _make_regexes(self):
+        """Make regex from options."""
         if self.opt.textonly:
             pattern = '^(.*)$'
         else:
@@ -247,20 +208,63 @@ class PageFromFileReader(OptionHandler):
         title_regex = re.compile(
             re.escape(self.opt.titlestart) + '(.*?)'
             + re.escape(self.opt.titleend))
-        location = page_regex.search(text)
+        return page_regex, title_regex
+
+    @property
+    def generator(self) -> Iterator[pywikibot.Page]:
+        """Read file and yield a page with content from file.
+
+        content is stored as a page attribute defined by CTX_ATTR.
+
+        .. versionchanged:: 7.6
+           changed from iterator method to generator property
+        """
+        pywikibot.info(f"\n\nReading '{self.filename}'...")
+        try:
+            with codecs.open(self.filename, 'r',
+                             encoding=config.textfile_encoding) as f:
+                text = f.read()
+
+        except OSError as e:
+            pywikibot.error(e)
+            return
+
+        length = 0
+        while text:
+            try:
+                length, title, contents = self.find_page(text)
+            except TypeError:
+                if not length:
+                    pywikibot.info('\nStart or end marker not found.')
+                else:
+                    pywikibot.info('End of file.')
+                break
+
+            except NoTitleError as err:
+                pywikibot.info('\nNo title found - skipping a page.')
+                text = text[err.offset:]
+            else:
+                page = pywikibot.Page(self.site, title)
+                setattr(page, CTX_ATTR, contents.strip())
+                yield page
+                text = text[length:]
+
+    def find_page(self, text) -> Tuple[int, str, str]:
+        """Find page to work on."""
+        location = self.page_regex.search(text)
         if self.opt.include:
-            contents = location.group()
+            contents = location[0]
         else:
-            contents = location.group(1)
+            contents = location[1]
 
         title = self.opt.title
         if not title:
             try:
-                title = title_regex.search(contents).group(1)
+                title = self.title_regex.search(contents)[1]
                 if self.opt.notitle:
                     # Remove title (to allow creation of redirects)
-                    contents = title_regex.sub('', contents, count=1)
-            except AttributeError:
+                    contents = self.title_regex.sub('', contents, count=1)
+            except TypeError:
                 raise NoTitleError(location.end())
 
         return location.end(), title, contents
@@ -300,13 +304,15 @@ def main(*args: str) -> None:
         elif option in ('nocontent', 'summary'):
             options[option] = value
         else:
-            pywikibot.output('Disregarding unknown argument {}.'.format(arg))
+            pywikibot.info(f'Disregarding unknown argument {arg}.')
 
     options['always'] = 'showdiff' not in options
 
+    # Check if self.file name exists. If not, ask for a new filename.
+    # User can quit.
     failed_filename = False
     while not os.path.isfile(filename):
-        pywikibot.output("\nFile '{}' does not exist. ".format(filename))
+        pywikibot.info(f"\nFile '{filename}' does not exist. ")
         _input = pywikibot.input(
             'Please enter the file name [q to quit]:')
         if _input == 'q':

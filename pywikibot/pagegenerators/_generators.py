@@ -31,6 +31,7 @@ from pywikibot.backports import (
 from pywikibot.comms import http
 from pywikibot.exceptions import APIError, ServerError
 from pywikibot.tools import deprecated
+from pywikibot.tools.collections import GeneratorWrapper
 from pywikibot.tools.itertools import filter_unique, itergroup
 
 
@@ -64,7 +65,7 @@ def AllpagesPageGenerator(
     if site is None:
         site = pywikibot.Site()
 
-    filterredir = None  # type: Optional[bool]
+    filterredir: Optional[bool] = None
     if not includeredirects:
         filterredir = False
     elif includeredirects == 'only':
@@ -103,7 +104,7 @@ def PrefixingPageGenerator(prefix: str,
         namespace = prefixlink.namespace
     title = prefixlink.title
 
-    filterredir = None  # type: Optional[bool]
+    filterredir: Optional[bool] = None
     if not includeredirects:
         filterredir = False
     elif includeredirects == 'only':
@@ -304,7 +305,7 @@ def LinkedPageGenerator(
 ) -> Iterable['pywikibot.page.Page']:
     """Yield all pages linked from a specific page.
 
-    See :py:obj:`pywikibot.page.BasePage.linkedPages` for details.
+    See :py:obj:`page.BasePage.linkedPages` for details.
 
     :param linkingPage: the page that links to the pages we want
     :param total: the total number of pages to iterate
@@ -332,8 +333,8 @@ def _yield_titles(f: Union[codecs.StreamReaderWriter, io.StringIO],
         # This makes it possible to work on different wikis using a single
         # text file, but also could be dangerous because you might
         # inadvertently change pages on another wiki!
-        yield pywikibot.Page(pywikibot.Link(linkmatch.group('title'),
-                                            site))
+        yield pywikibot.Page(pywikibot.Link(linkmatch['title'], site))
+
     if linkmatch is not None:
         return
 
@@ -780,9 +781,8 @@ def LiveRCPageGenerator(site: OPT_SITE_TYPE = None,
 # following classes just ported from version 1 without revision; not tested
 
 
-class GoogleSearchPageGenerator(Iterable['pywikibot.page.Page']):
-    """
-    Page generator using Google search results.
+class GoogleSearchPageGenerator(GeneratorWrapper):
+    """Page generator using Google search results.
 
     To use this generator, you need to install the package 'google':
 
@@ -793,6 +793,9 @@ class GoogleSearchPageGenerator(Iterable['pywikibot.page.Page']):
 
     As there are concerns about Google's Terms of Service, this
     generator prints a warning for each query.
+
+    .. versionchanged:: 7.6
+       subclassed from :class:`tools.collections.GeneratorWrapper`
     """
 
     def __init__(self, query: Optional[str] = None,
@@ -834,21 +837,25 @@ class GoogleSearchPageGenerator(Iterable['pywikibot.page.Page']):
         pywikibot.warning('Please read http://www.google.com/accounts/TOS')
         yield from google.search(query)
 
-    def __iter__(self):
-        """Iterate results.
+    @property
+    def generator(self) -> Iterator['pywikibot.page.Page']:
+        """Yield results from :meth:`queryGoogle` query.
 
         Google contains links in the format:
         https://de.wikipedia.org/wiki/en:Foobar
+
+        .. versionchanged:: 7.6
+           changed from iterator method to generator property
         """
         # restrict query to local site
-        local_query = '{} site:{}'.format(self.query, self.site.hostname())
+        local_query = f'{self.query} site:{self.site.hostname()}'
         base = 'http://{}{}'.format(self.site.hostname(),
                                     self.site.articlepath)
         pattern = base.replace('{}', '(.+)')
         for url in self.queryGoogle(local_query):
             m = re.search(pattern, url)
             if m:
-                page = pywikibot.Page(pywikibot.Link(m.group(1), self.site))
+                page = pywikibot.Page(pywikibot.Link(m[1], self.site))
                 if page.site == self.site:
                     yield page
 
@@ -894,7 +901,7 @@ def MySQLPageGenerator(query: str, site: OPT_SITE_TYPE = None,
 
 
 class XMLDumpPageGenerator(abc.Iterator):  # type: ignore[type-arg]
-    """Xml generator that yields Page objects.
+    """Xml iterator that yields Page objects.
 
     .. versionadded:: 7.2
        the `content` parameter
@@ -923,7 +930,7 @@ class XMLDumpPageGenerator(abc.Iterator):  # type: ignore[type-arg]
         self.content = content
         self.skipping = bool(start)
 
-        self.start = None  # type: Optional[str]
+        self.start: Optional[str] = None
         if start is not None and self.skipping:
             self.start = start.replace('_', ' ')
 
@@ -955,7 +962,7 @@ class XMLDumpPageGenerator(abc.Iterator):  # type: ignore[type-arg]
 @deprecated('XMLDumpPageGenerator with content=True parameter', since='7.2.0')
 class XMLDumpOldPageGenerator(XMLDumpPageGenerator):
 
-    """Xml generator that yields Page objects with old text loaded.
+    """Xml iterator that yields Page objects with old text loaded.
 
     .. deprecated:: 7.2
        :class:`XMLDumpPageGenerator` with `content` parameter should be
@@ -977,10 +984,10 @@ def YearPageGenerator(start: int = 1, end: int = 2050,
     """
     if site is None:
         site = pywikibot.Site()
-    pywikibot.output('Starting with year {}'.format(start))
+    pywikibot.info(f'Starting with year {start}')
     for i in range(start, end + 1):
         if i % 100 == 0:
-            pywikibot.output('Preparing {}...'.format(i))
+            pywikibot.info(f'Preparing {i}...')
         # There is no year 0
         if i != 0:
             current_year = date.formatYear(site.lang, i)
@@ -1000,7 +1007,7 @@ def DayPageGenerator(start_month: int = 1, end_month: int = 12,
         site = pywikibot.Site()
     lang = site.lang
     first_page = pywikibot.Page(site, date.format_date(start_month, 1, lang))
-    pywikibot.output('Starting with {}'.format(first_page.title(as_link=True)))
+    pywikibot.info(f'Starting with {first_page.title(as_link=True)}')
     for month in range(start_month, end_month + 1):
         for day in range(1, calendar.monthrange(year, month)[1] + 1):
             yield pywikibot.Page(
@@ -1093,11 +1100,13 @@ def WikibaseSearchItemPageGenerator(text: str,
     return (pywikibot.ItemPage(repo, item['id']) for item in data)
 
 
-class PetScanPageGenerator:
+class PetScanPageGenerator(GeneratorWrapper):
     """Queries PetScan to generate pages.
 
     .. seealso:: https://petscan.wmflabs.org/
     .. versionadded:: 3.0
+    .. versionchanged:: 7.6
+       subclassed from :class:`tools.collections.GeneratorWrapper`
     """
 
     def __init__(self, categories: Sequence[str],
@@ -1152,7 +1161,7 @@ class PetScanPageGenerator:
 
         if namespaces:
             for namespace in namespaces:
-                query['ns[{}]'.format(int(namespace))] = 1
+                query[f'ns[{int(namespace)}]'] = 1
 
         query_final = query.copy()
         query_final.update(extra_options)
@@ -1173,12 +1182,12 @@ class PetScanPageGenerator:
         try:
             req = http.fetch(url, params=self.opts)
         except ReadTimeout:
-            raise ServerError('received ReadTimeout from {}'.format(url))
+            raise ServerError(f'received ReadTimeout from {url}')
 
         server_err = HTTPStatus.INTERNAL_SERVER_ERROR
         if server_err <= req.status_code < server_err + 100:
             raise ServerError(
-                'received {} status from {}'.format(req.status_code, req.url))
+                f'received {req.status_code} status from {req.url}')
 
         data = req.json()
         if 'error' in data:
@@ -1187,7 +1196,13 @@ class PetScanPageGenerator:
         raw_pages = data['*'][0]['a']['*']
         yield from raw_pages
 
-    def __iter__(self) -> Iterator['pywikibot.page.Page']:
+    @property
+    def generator(self) -> Iterator['pywikibot.page.Page']:
+        """Yield results from :meth:`query`.
+
+        .. versionchanged:: 7.6
+           changed from iterator method to generator property
+        """
         for raw_page in self.query():
             page = pywikibot.Page(self.site, raw_page['title'],
                                   int(raw_page['namespace']))
