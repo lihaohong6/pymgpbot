@@ -1138,6 +1138,8 @@ class APISite(
 
     @property
     def mw_version(self) -> MediaWikiVersion:
+        if self.family.name == "mirror":
+            return MediaWikiVersion("1.38.2")
         """Return self.version() as a MediaWikiVersion object.
 
         Cache the result for 24 hours.
